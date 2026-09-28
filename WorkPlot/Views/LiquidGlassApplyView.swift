@@ -68,7 +68,8 @@ struct LiquidGlassApplyView: View {
                     .padding(.vertical, 6)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(Array(lgTweaks.enumerated()), id: \.element.id) { index, tweak in
+                    ForEach(lgTweaks.indices, id: \.self) { index in
+                        let tweak = lgTweaks[index]
                         HStack(spacing: 12) {
                             Image(systemName: tweak.symbol)
                                 .font(.body.weight(.semibold))
@@ -128,8 +129,8 @@ struct LiquidGlassApplyView: View {
             }
             if !model.warnings.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(model.warnings.enumerated()), id: \.offset) { _, warning in
-                        Label(warning, systemImage: "exclamationmark.triangle")
+                    ForEach(model.warnings.indices, id: \.self) { index in
+                        Label(model.warnings[index], systemImage: "exclamationmark.triangle")
                             .font(.footnote)
                             .foregroundStyle(Theme.caution)
                     }

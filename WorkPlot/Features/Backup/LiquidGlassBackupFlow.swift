@@ -55,6 +55,7 @@ struct LiquidGlassBackupInfo {
 /// Create-once semantics, like `BackupManager.ensureBackup`: the snapshot
 /// is taken from the untouched files and is never overwritten, so Restore
 /// always returns the device to its pre-tweak state.
+@MainActor
 enum LiquidGlassBackupStore {
 
     enum BackupError: LocalizedError {
@@ -103,11 +104,14 @@ enum LiquidGlassBackupStore {
     /// Every reachable on-device target file, as (domain, path), in probe
     /// order. Uses the same path list `GestaltStore` writes through.
     static func reachableTargets() -> [(domain: PlistDomain, path: String)] {
-        domains.flatMap { domain in
-            GestaltStore.preferencePlistPaths(for: domain)
-                .filter { FileManager.default.fileExists(atPath: $0) }
-                .map { (domain, $0) }
+        var out: [(domain: PlistDomain, path: String)] = []
+        for domain in domains {
+            for path in GestaltStore.preferencePlistPaths(for: domain) {
+                guard FileManager.default.fileExists(atPath: path) else { continue }
+                out.append((domain: domain, path: path))
+            }
         }
+        return out
     }
 
     static var hasBackup: Bool {
@@ -118,7 +122,7 @@ enum LiquidGlassBackupStore {
         guard let manifest = readManifest() else { return nil }
         return LiquidGlassBackupInfo(
             createdAt: manifest.createdAt,
-            files: manifest.entries.map { ($0.fileName, $0.byteCount) }
+            files: manifest.entries.map { (name: $0.fileName, byteCount: $0.byteCount) }
         )
     }
 
@@ -147,7 +151,7 @@ enum LiquidGlassBackupStore {
         try encoded.write(to: manifestURL, options: .atomic)
         return LiquidGlassBackupInfo(
             createdAt: manifest.createdAt,
-            files: entries.map { ($0.fileName, $0.byteCount) }
+            files: entries.map { (name: $0.fileName, byteCount: $0.byteCount) }
         )
     }
 
@@ -193,6 +197,7 @@ enum LiquidGlassBackupStore {
 /// the pre-images back, so the last apply can always be undone. Only the
 /// files the flow actually touches are recorded: a minimal restore set,
 /// not a full backup.
+@MainActor
 struct BookRestoreSession {
     struct PreImage {
         let path: String
@@ -258,9 +263,16 @@ enum LiquidGlassFlowError: LocalizedError {
 /// (bookrestore-style) on iOS 26. Any write or verification failure
 /// triggers the restore half of the flow, so the device is never left
 /// half-modified.
+
+
+import Foundation
+import SwiftUI
+
+// MARK: - Apply model
+
+/// View model for the Disable Liquid Glass apply flow.
 @MainActor
 final class LiquidGlassApplyModel: ObservableObject {
-    /// Which step is currently running, for per-button spinners.
     enum BusyTask { case backingUp, applying, restoring }
 
     @Published private(set) var isBusy = false
@@ -290,10 +302,6 @@ final class LiquidGlassApplyModel: ObservableObject {
         refresh()
     }
 
-    // MARK: Backup (iOS 27)
-
-    /// Snapshots the pristine target files. Create-once — an existing
-    /// snapshot is never overwritten.
     func createBackup() {
         guard !isBusy else { return }
         begin(.backingUp)
@@ -301,17 +309,13 @@ final class LiquidGlassApplyModel: ObservableObject {
         do {
             backupInfo = try LiquidGlassBackupStore.createFullBackup()
             warnings = []
-            statusMessage = "Backup created — you can now press Apply."
+            statusMessage = "Backup created. You can now press Apply."
         } catch {
             statusMessage = nil
             warnings = [error.localizedDescription]
         }
     }
 
-    // MARK: Apply
-
-    /// Applies the staged liquid-glass tweaks through the
-    /// version-appropriate flow, then verifies every touched key.
     func apply(tweaks: [Tweak]) {
         guard !isBusy else { return }
         begin(.applying)
@@ -319,24 +323,25 @@ final class LiquidGlassApplyModel: ObservableObject {
         do {
             let changed = try runApply(tweaks: tweaks)
             lastChangedFiles = changed
-            statusMessage = changed == 0
-                ? "Nothing changed — the keys already match the staged tweaks."
-                : "Applied to \(changed) file\(changed == 1 ? "" : "s"). Respring to take effect."
+            if changed == 0 {
+                statusMessage = "Nothing changed."
+            } else {
+                statusMessage = "Applied to \(changed) files. Respring to take effect."
+            }
         } catch {
             statusMessage = nil
-            // `runApply` already surfaced write warnings before throwing.
             if warnings.isEmpty { warnings = [error.localizedDescription] }
         }
     }
 
     private func runApply(tweaks: [Tweak]) throws -> Int {
-        let inScope = tweaks.filter {
-            $0.category == .liquidGlass && !$0.plistModifications.isEmpty
-        }
+        let inScope = tweaks.filter { $0.category == .liquidGlass && !$0.plistModifications.isEmpty }
         guard !inScope.isEmpty else { throw LiquidGlassFlowError.nothingToApply }
-        let enabled = inScope.filter(\.isEnabled)
-        let disabled = inScope.filter { !$0.isEnabled }
-
+        var enabled: [Tweak] = []
+        var disabled: [Tweak] = []
+        for t in inScope {
+            if t.isEnabled { enabled.append(t) } else { disabled.append(t) }
+        }
         switch flow {
         case .fullBackup:
             guard LiquidGlassBackupStore.hasBackup else {
@@ -344,35 +349,30 @@ final class LiquidGlassApplyModel: ObservableObject {
             }
             var stepWarnings: [String] = []
             do {
-                let changed = Self.write(enabled: enabled,
-                                         disabled: disabled,
-                                         warnings: &stepWarnings)
-                stepWarnings += Self.verify(enabled: enabled, disabled: disabled)
+                let changed = Self.write(enabled: enabled, disabled: disabled, warnings: &stepWarnings)
+                let vw = try Self.verify(enabled: enabled, disabled: disabled)
+                stepWarnings.append(contentsOf: vw)
                 warnings = stepWarnings
                 return changed
             } catch {
-                // Full restore: pristine snapshot back over the live files.
                 try? LiquidGlassBackupStore.restoreFullBackup()
-                warnings = stepWarnings + [error.localizedDescription,
-                                           "The pristine backup was restored."]
+                warnings = stepWarnings + [error.localizedDescription]
                 throw error
             }
         case .partialRestore:
             let session = BookRestoreSession.capture()
             var stepWarnings: [String] = []
             do {
-                let changed = Self.write(enabled: enabled,
-                                         disabled: disabled,
-                                         warnings: &stepWarnings)
-                stepWarnings += Self.verify(enabled: enabled, disabled: disabled)
+                let changed = Self.write(enabled: enabled, disabled: disabled, warnings: &stepWarnings)
+                let vw = try Self.verify(enabled: enabled, disabled: disabled)
+                stepWarnings.append(contentsOf: vw)
                 lastSession = session
                 canUndoPartial = true
                 warnings = stepWarnings
                 return changed
             } catch {
                 try? session.revert()
-                warnings = stepWarnings + [error.localizedDescription,
-                                           "The pre-apply state was restored."]
+                warnings = stepWarnings + [error.localizedDescription]
                 throw error
             }
         case .unsupported:
@@ -380,55 +380,40 @@ final class LiquidGlassApplyModel: ObservableObject {
         }
     }
 
-    /// Writes the staged tweaks through `GestaltStore`'s shared
-    /// probe + lease + verified in-place write path: enabled tweaks write
-    /// their values, disabled tweaks have their keys removed. Returns the
-    /// number of files actually changed.
-    private static func write(enabled: [Tweak],
-                              disabled: [Tweak],
-                              warnings: inout [String]) -> Int {
+    private static func write(enabled: [Tweak], disabled: [Tweak], warnings: inout [String]) -> Int {
         var changed = 0
         for tweak in enabled {
-            changed += GestaltStore.applyPlistModifications(tweak.plistModifications,
-                                                            enabled: true,
-                                                            warnings: &warnings)
+            changed += GestaltStore.applyPlistModifications(tweak.plistModifications, enabled: true, warnings: &warnings)
         }
         for tweak in disabled {
-            changed += GestaltStore.applyPlistModifications(tweak.plistModifications,
-                                                            enabled: false,
-                                                            warnings: &warnings)
+            changed += GestaltStore.applyPlistModifications(tweak.plistModifications, enabled: false, warnings: &warnings)
         }
         return changed
     }
 
-    /// Re-reads every staged key from every reachable copy and confirms the
-    /// expected presence/value. Returns non-fatal warnings (e.g. a domain
-    /// with no reachable file); throws on the first real mismatch.
     private static func verify(enabled: [Tweak], disabled: [Tweak]) throws -> [String] {
-        var verifyWarnings: [String] = []
+        var result: [String] = []
         for tweak in enabled {
             for mod in tweak.plistModifications {
-                switch Self.check(mod, enabled: true) {
-                case .ok: break
-                case .unreachable:
-                    verifyWarnings.append("\(tweak.title): \(mod.key) — target file not reachable, skipped.")
-                case .mismatch:
-                    throw LiquidGlassFlowError.verifyFailed("\(tweak.title): \(mod.key) did not verify after writing.")
+                let r = Self.check(mod, enabled: true)
+                if r == .mismatch {
+                    throw LiquidGlassFlowError.verifyFailed("\(tweak.title): \(mod.key)")
+                } else if r == .unreachable {
+                    result.append("\(tweak.title): \(mod.key) unreachable")
                 }
             }
         }
         for tweak in disabled {
             for mod in tweak.plistModifications {
-                switch Self.check(mod, enabled: false) {
-                case .ok: break
-                case .unreachable:
-                    verifyWarnings.append("\(tweak.title): \(mod.key) — target file not reachable, skipped.")
-                case .mismatch:
-                    throw LiquidGlassFlowError.verifyFailed("\(tweak.title): \(mod.key) did not verify after writing.")
+                let r = Self.check(mod, enabled: false)
+                if r == .mismatch {
+                    throw LiquidGlassFlowError.verifyFailed("\(tweak.title): \(mod.key)")
+                } else if r == .unreachable {
+                    result.append("\(tweak.title): \(mod.key) unreachable")
                 }
             }
         }
-        return verifyWarnings
+        return result
     }
 
     private enum CheckResult { case ok, unreachable, mismatch }
@@ -439,16 +424,17 @@ final class LiquidGlassApplyModel: ObservableObject {
         for path in paths {
             guard let data = FileManager.default.contents(atPath: path) else { continue }
             var format = PropertyListSerialization.PropertyListFormat.binary
-            guard let plist = try? PropertyListSerialization.propertyList(
-                from: data, options: [], format: &format) as? [String: Any]
-            else { continue }
+            guard let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: &format) as? [String: Any] else { continue }
             checked += 1
             if enabled {
                 switch mod.value {
                 case .remove, .keepCurrent:
                     break
                 default:
-                    guard plistScalarsEqual(plist[mod.key], mod.value.plistObject) else {
+                    let current = plist[mod.key]
+                    let newObj = mod.value.plistObject as? NSObject
+                    let curObj = current as? NSObject
+                    if curObj == nil || newObj == nil || curObj!.isEqual(newObj!) == false {
                         return .mismatch
                     }
                 }
@@ -459,17 +445,6 @@ final class LiquidGlassApplyModel: ObservableObject {
         return checked > 0 ? .ok : .unreachable
     }
 
-    /// True when two plist scalars are equal (bridged through NSObject).
-    /// Mirrors `GestaltStore`'s private helper, which this file can't see.
-    private static func plistScalarsEqual(_ current: Any?, _ new: Any) -> Bool {
-        guard let current, let newObject = new as? NSObject else { return false }
-        return (current as? NSObject)?.isEqual(newObject) ?? false
-    }
-
-    // MARK: Restore / undo
-
-    /// iOS 27: full restore of the pristine snapshot.
-    /// iOS 26: revert the last partial-restore apply via its pre-images.
     func restore() {
         guard !isBusy else { return }
         begin(.restoring)
