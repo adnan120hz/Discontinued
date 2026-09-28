@@ -100,14 +100,7 @@ enum AirLiftFileWriter {
     static func writeFiles(_ files: [(name: String, data: Data)],
                            toDirectory dir: String) throws {
         guard !files.isEmpty else { return }
-        // Prefer the genuine AirLift pairing exploit whenever a pairing file
-        // exists (per AirCard-iOS, TelephonyUI-10 writes go through the
-        // pairing exploit, not bad_query). Fall back to bad_query only when
-        // not paired.
-        let pairingPath = AirLiftManager.pairingFilePath()
-        if FileManager.default.fileExists(atPath: pairingPath) {
-            try writeFilesViaAirLift(files, toDirectory: dir)
-        } else if WorkSlopSupport.isIOS27() {
+        if WorkSlopSupport.isIOS27() {
             try writeFilesViaAirLift(files, toDirectory: dir)
         } else {
             for file in files {
