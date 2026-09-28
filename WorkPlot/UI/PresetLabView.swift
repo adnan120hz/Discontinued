@@ -94,10 +94,9 @@ struct PresetLabView: View {
                 "Restart Recommended",
                 isPresented: $showRestartAlert
             ) {
-                Button("Respring") { manager.requestRespring() }
-                Button("Later", role: .cancel) {}
+                Button("OK", role: .cancel) {}
             } message: {
-                Text("Restart SpringBoard or reboot so the applied values take effect.")
+                Text("Please restart your device so the applied values take effect.")
             }
             .fileImporter(
                 isPresented: $isShowingImporter,

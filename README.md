@@ -117,9 +117,9 @@ WorkPlot is a rebrand and continuation of an earlier MobileGestalt editor.
 
 **Reference apps**
 
-- [frs0n/placard](https://github.com/frs0n/placard)
+- [GoldenNugget-Team/GoldenNugget-mobile](https://github.com/GoldenNugget-Team/GoldenNugget-mobile) — Liquid Glass tweaks reference
 
-**Individuals:** Mond, Ketamine, Toto.
+**Individuals:** Mond.
 
 Full attribution and licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). WorkPlot incorporates GPLv3-licensed `bad_query` source code.
 

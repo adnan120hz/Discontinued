@@ -210,7 +210,7 @@ enum SystemTweaks {
         Tweak(
             id: "supervision-text",
             title: "Show Supervision Text on Lock Screen",
-            subtitle: "Show the device-supervision text on the Lock Screen. Respring to apply.",
+            subtitle: "Show the device-supervision text on the Lock Screen. Restart your device to apply.",
             category: .system,
             symbol: "checkmark.shield.fill",
             isRisky: false,

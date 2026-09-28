@@ -25,7 +25,7 @@ enum DisplayTweaks {
             category: .display,
             symbol: "rectangle.inset.filled",
             isRisky: false,
-            notes: "Enable-only override (matches Nugget ≥ 7.2). Takes effect after a respring; does not remove the island on devices that have one natively.",
+            notes: "Enable-only override (matches Nugget ≥ 7.2). Takes effect after a full device restart; does not remove the island on devices that have one natively.",
             modifications: [
                 GestaltModification(key: "YlEtTtHlNesRBMal1CqRaA",
                                     subkey: nil, value: .int(1))
@@ -34,7 +34,7 @@ enum DisplayTweaks {
         Tweak(
             id: "disable-dynamic-island",
             title: "Disable Dynamic Island",
-            subtitle: "Hide the Dynamic Island completely (respring to apply).",
+            subtitle: "Hide the Dynamic Island completely (restart device to apply).",
             category: .display,
             symbol: "eye.slash",
             isRisky: false,

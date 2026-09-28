@@ -40,7 +40,9 @@ struct GestaltFieldEditorView: View {
                     .disabled(!manager.sandboxGranted)
                 }
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Respring") { manager.requestRespring() }
+                    Text("Restart device to apply")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
             .sheet(isPresented: $isShowingAddSheet) {
