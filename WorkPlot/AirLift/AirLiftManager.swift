@@ -123,7 +123,7 @@ final class AirLiftManager: ObservableObject {
     /// returns the canonical path. Returns `sourcePath` unchanged when it
     /// has no readable bytes.
     @discardableResult
-    static func syncCanonicalPairingFile(from sourcePath: String) -> String {
+    nonisolated static func syncCanonicalPairingFile(from sourcePath: String) -> String {
         let canonical = canonicalPairingPath()
         if let data = try? Data(contentsOf: URL(fileURLWithPath: sourcePath)),
            !data.isEmpty {
