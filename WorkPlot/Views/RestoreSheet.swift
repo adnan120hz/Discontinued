@@ -57,7 +57,7 @@ struct RestoreSheet: View {
                 }
             }
             .padding(Theme.pagePadding)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Theme.page)
             .navigationTitle("Recovery")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

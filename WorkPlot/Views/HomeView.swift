@@ -1,8 +1,11 @@
 import SwiftUI
 
+/// WorkSlop tweak browser: a single-column capability list under a solid
+/// blue status banner. Tapping a row toggles the tweak; tweaks with extra
+/// options expand an inline configuration panel under the row.
 struct HomeView: View {
     @EnvironmentObject private var store: GestaltStore
-    /// `nil` selects "All" — every tweak, uncategorized.
+    /// `nil` selects "All" — every tweak and tool, uncategorized.
     @State private var category: TweakCategory? = .display
     @State private var configurationID: String?
     @State private var searchText = ""
@@ -23,11 +26,11 @@ struct HomeView: View {
             Group {
                 if DeviceCompatibility.supportsFullFeatureSet {
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 24) {
-                            commandStatus
+                        VStack(alignment: .leading, spacing: 20) {
+                            statusBanner
                             categoryRail
                             catalog
-                            if !selectedTweaks.isEmpty { activeConfiguration }
+                            if !selectedTweaks.isEmpty { stagedSection }
                             respringButton
                         }
                         .padding(.horizontal, Theme.pagePadding)
@@ -39,43 +42,50 @@ struct HomeView: View {
                     FeatureUnsupportedView(feature: "Tweaks")
                 }
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Theme.page)
             .navigationTitle("Tweaks")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                if DeviceCompatibility.supportsFullFeatureSet {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        NavigationLink { ApplyChangesView() } label: {
-                            Image(systemName: "bolt.horizontal.circle")
-                        }
-                        .disabled(store.enabledCount == 0)
-                    }
-                }
-            }
         }
     }
 
-    private var commandStatus: some View {
-        HStack(alignment: .center, spacing: 16) {
-            AppMark(name: "ConsoleGlyph", size: 52, tint: store.enabledCount == 0 ? .secondary : .white)
-            VStack(alignment: .leading, spacing: 4) {
+    // MARK: - Status banner
+
+    private var statusBanner: some View {
+        HStack(alignment: .center, spacing: 14) {
+            AppMark(name: "ConsoleGlyph", size: 46, tint: .white)
+            VStack(alignment: .leading, spacing: 3) {
                 Text(store.enabledCount == 0 ? "No changes staged" : "\(store.enabledCount) changes staged")
                     .font(.headline)
-                Text(store.enabledCount == 0 ? "Tap a capability to turn it on." : "Tap any active capability again to turn it off.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white)
+                Text(store.enabledCount == 0 ? "Pick capabilities below to build your setup." : "Review everything before applying.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.85))
             }
-            Spacer(minLength: 0)
+            Spacer()
+            NavigationLink { ApplyChangesView() } label: {
+                Label("Review", systemImage: "bolt.horizontal.circle")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.wsBlue)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(.white, in: Capsule())
+            }
+            .disabled(store.enabledCount == 0)
+            .opacity(store.enabledCount == 0 ? 0.55 : 1)
         }
-        .padding(.top, 8)
+        .padding(16)
+        .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: Theme.wsBlue.opacity(0.35), radius: 12, x: 0, y: 4)
     }
+
+    // MARK: - Category picker
 
     private var categoryRail: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 9) {
-                categoryPill(title: "All", isSelected: category == nil) { category = nil }
+                categoryChip(title: "All", isSelected: category == nil) { category = nil }
                 ForEach(consoleCategories) { item in
-                    categoryPill(title: item.rawValue, isSelected: category == item) { category = item }
+                    categoryChip(title: item.rawValue, isSelected: category == item) { category = item }
                 }
             }
         }
@@ -84,7 +94,7 @@ struct HomeView: View {
         .padding(.horizontal, Theme.pagePadding)
     }
 
-    private func categoryPill(title: String, isSelected: Bool, select: @escaping () -> Void) -> some View {
+    private func categoryChip(title: String, isSelected: Bool, select: @escaping () -> Void) -> some View {
         Button {
             withAnimation(.snappy) {
                 select()
@@ -93,26 +103,25 @@ struct HomeView: View {
         } label: {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(isSelected ? .primary : .secondary)
-                .padding(.horizontal, 14)
+                .foregroundStyle(isSelected ? .white : Theme.wsBlue)
+                .padding(.horizontal, 15)
                 .padding(.vertical, 10)
-                .background(isSelected ? .white.opacity(0.14) : .clear, in: Capsule())
+                .background(
+                    isSelected ? Theme.wsBlue : Theme.card,
+                    in: Capsule()
+                )
+                .overlay(
+                    isSelected ? nil :
+                        Capsule().stroke(Theme.cardBorder, lineWidth: 1)
+                )
         }
         .buttonStyle(.plain)
     }
 
-    private var catalog: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            if let category {
-                categorySection(category)
-            } else {
-                flatCatalog
-            }
-        }
-    }
+    // MARK: - Catalog
 
-    /// Unified cell for the flat "All" list so tweaks and tools interleave
-    /// instead of rendering as two separate groups.
+    /// Unified row model so the flat "All" list interleaves tweaks and
+    /// tools instead of rendering as two separate groups.
     private enum FlatCell: Identifiable {
         case tweak(Tweak)
         case tool(ToolDef)
@@ -124,45 +133,27 @@ struct HomeView: View {
         }
     }
 
-    /// "All" selected: one flat sequential list — tweaks and tools interleaved,
-    /// no category grouping.
-    private var flatCatalog: some View {
-        let tweaks = store.tweaks.filter { $0.category != .ai && matchesSearch($0.title) }
-        let tools = toolDefs.filter { $0.id != "respring" && matchesSearch($0.title) }
-        var cells: [FlatCell] = []
-        var ti = 0, to = 0
-        while ti < tweaks.count || to < tools.count {
-            if ti < tweaks.count { cells.append(.tweak(tweaks[ti])); ti += 1 }
-            if to < tools.count { cells.append(.tool(tools[to])); to += 1 }
-        }
-        return VStack(alignment: .leading, spacing: 12) {
-            flatRows(cells)
-        }
-    }
-
-    private func flatRows(_ cells: [FlatCell]) -> some View {
-        ForEach(Array(stride(from: 0, to: cells.count, by: 2).enumerated()), id: \.offset) { _, start in
-            let row = Array(cells[start..<min(start + 2, cells.count)])
-            HStack(alignment: .top, spacing: 12) {
-                ForEach(row) { cell in
-                    switch cell {
-                    case .tweak(let tweak):
-                        Button { toggle(tweak) } label: {
-                            TweakCatalogTile(tweak: tweak, isConfiguring: configurationID == tweak.id)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHint(tweak.isEnabled ? "Disables this capability" : "Enables this capability")
-                    case .tool(let tool):
-                        toolCatalogTile(tool)
-                    }
+    private var catalog: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let category {
+                let tweaks = store.tweaks.filter { $0.category == category && matchesSearch($0.title) }
+                // Tools flow into the same list as the tweaks instead of
+                // starting their own group.
+                let tools = toolDefs.filter { $0.category == category && $0.id != "respring" && matchesSearch($0.title) }
+                let cells = tweaks.map { FlatCell.tweak($0) } + tools.map { FlatCell.tool($0) }
+                SectionHeader(category.rawValue, detail: "\(cells.count) available")
+                cellList(cells)
+            } else {
+                let tweaks = store.tweaks.filter { $0.category != .ai && matchesSearch($0.title) }
+                let tools = toolDefs.filter { $0.id != "respring" && matchesSearch($0.title) }
+                var cells: [FlatCell] = []
+                var ti = 0, to = 0
+                while ti < tweaks.count || to < tools.count {
+                    if ti < tweaks.count { cells.append(.tweak(tweaks[ti])); ti += 1 }
+                    if to < tools.count { cells.append(.tool(tools[to])); to += 1 }
                 }
-                if row.count == 1 { Color.clear.frame(maxWidth: .infinity) }
-            }
-            if let tweak = configuringTweak,
-               row.contains(where: { if case .tweak(let t) = $0 { return t.id == tweak.id }; return false }),
-               let detail = tweak.detail {
-                InlineTweakConfiguration(tweak: tweak, detail: detail)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                SectionHeader("All capabilities", detail: "\(cells.count) available")
+                cellList(cells)
             }
         }
     }
@@ -171,42 +162,108 @@ struct HomeView: View {
         searchText.isEmpty || title.localizedCaseInsensitiveContains(searchText)
     }
 
-    private func categorySection(_ cat: TweakCategory) -> some View {
-        let tweaks = store.tweaks.filter { $0.category == cat && matchesSearch($0.title) }
-        let tools = toolDefs.filter { $0.category == cat && $0.id != "respring" && matchesSearch($0.title) }
-        // Tools flow into the last half-empty tweak row instead of starting
-        // their own group, so an odd tweak count leaves no gap mid-catalog.
-        let cells = tweaks.map { FlatCell.tweak($0) } + tools.map { FlatCell.tool($0) }
-        return VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(cat.rawValue)
-            HStack {
-                Text("\(cells.count) available")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
+    /// One solid card holding a divided single-column list. A tweak that is
+    /// being configured expands its inline panel directly under its row.
+    private func cellList(_ cells: [FlatCell]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(cells.enumerated()), id: \.element.id) { index, cell in
+                cellRow(cell)
+                if let tweak = configuringTweak,
+                   case .tweak(let rowTweak) = cell, rowTweak.id == tweak.id,
+                   let detail = tweak.detail {
+                    InlineTweakConfiguration(tweak: tweak, detail: detail)
+                        .padding(.vertical, 6)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+                if index < cells.count - 1 {
+                    Divider().padding(.leading, 58)
+                }
             }
-            // Laid out row by row rather than as one LazyVGrid so the
-            // configuration panel can sit directly under the row holding the
-            // tile that opened it, instead of after the whole catalog.
-            VStack(alignment: .leading, spacing: 12) {
-                flatRows(cells)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 16)
+        .wsCard(cornerRadius: 18)
+    }
+
+    @ViewBuilder
+    private func cellRow(_ cell: FlatCell) -> some View {
+        switch cell {
+        case .tweak(let tweak):
+            Button { toggle(tweak) } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: tweak.symbol)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 42, height: 42)
+                        .background(
+                            tweak.isEnabled ? Theme.wsBlue : Theme.wsBlue.opacity(0.35),
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        )
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(tweak.title)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.primary)
+                        Text(tweak.isEnabled && configurationID == tweak.id ? "Configuring" : tweak.subtitle)
+                            .font(.caption)
+                            .foregroundStyle(tweak.isEnabled ? Theme.wsBlue : .secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: tweak.isEnabled ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(tweak.isEnabled ? Theme.wsBlue : Color(uiColor: .tertiaryLabel))
+                }
+                .padding(.vertical, 9)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityHint(tweak.isEnabled ? "Disables this capability" : "Enables this capability")
+        case .tool(let tool):
+            toolRow(tool)
         }
     }
 
     @ViewBuilder
-    private func toolCatalogTile(_ tool: ToolDef) -> some View {
-        if let destination = tool.destination {
-            NavigationLink(destination: destination()) {
-                ToolTile(title: tool.title, detail: tool.subtitle, symbol: tool.symbol)
+    private func toolRow(_ tool: ToolDef) -> some View {
+        let label = HStack(spacing: 14) {
+            Image(systemName: tool.symbol)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 42, height: 42)
+                .background(Theme.wsBlue.opacity(0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tool.title)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(tool.subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            .buttonStyle(.plain)
-        } else if let action = tool.action {
-            Button(action: action) {
-                ToolTile(title: tool.title, detail: tool.subtitle, symbol: tool.symbol)
-            }
-            .buttonStyle(.plain)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
+        .padding(.vertical, 9)
+        .contentShape(Rectangle())
+        if let destination = tool.destination {
+            NavigationLink(destination: destination()) { label }
+                .buttonStyle(.plain)
+        } else if let action = tool.action {
+            Button(action: action) { label }
+                .buttonStyle(.plain)
+        }
+    }
+
+    private struct ToolDef: Identifiable {
+        let id: String
+        let title: String
+        let subtitle: String
+        let symbol: String
+        let category: TweakCategory
+        var destination: (() -> AnyView)? = nil
+        var action: (() -> Void)? = nil
     }
 
     private var toolDefs: [ToolDef] {
@@ -221,28 +278,60 @@ struct HomeView: View {
         ]
     }
 
-    private struct ToolDef: Identifiable {
-        let id: String
-        let title: String
-        let subtitle: String
-        let symbol: String
-        let category: TweakCategory
-        var destination: (() -> AnyView)? = nil
-        var action: (() -> Void)? = nil
+    // MARK: - Staged changes
+
+    private var stagedSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader("Staged changes", detail: "\(selectedTweaks.count)")
+            VStack(spacing: 0) {
+                ForEach(Array(selectedTweaks.prefix(4).enumerated()), id: \.element.id) { index, tweak in
+                    HStack(spacing: 12) {
+                        Image(systemName: tweak.symbol)
+                            .foregroundStyle(.white)
+                            .frame(width: 28, height: 28)
+                            .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        Text(tweak.title)
+                            .font(.subheadline.weight(.medium))
+                        Spacer()
+                        Image(systemName: "checkmark")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Theme.wsBlue)
+                    }
+                    .padding(.vertical, 9)
+                    if index < min(selectedTweaks.count, 4) - 1 {
+                        Divider().padding(.leading, 40)
+                    }
+                }
+                if selectedTweaks.count > 4 {
+                    Text("+ \(selectedTweaks.count - 4) more changes")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 10)
+                }
+            }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 16)
+            .wsCard(cornerRadius: 18)
+        }
     }
+
+    // MARK: - Respring
 
     private var respringButton: some View {
         Button { RespringHelper.shared.trigger() } label: {
             Label("Respring", systemImage: "arrow.clockwise")
-                .font(.subheadline.weight(.semibold))
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Theme.wsBlue)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.clear, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .liquidGlass(cornerRadius: 16)
+                .padding(.vertical, 15)
+                .wsCard(cornerRadius: 18)
         }
         .buttonStyle(.plain)
         .accessibilityHint("Restart SpringBoard")
     }
+
+    // MARK: - Helpers
 
     private var configuringTweak: Tweak? {
         guard let configurationID,
@@ -251,108 +340,12 @@ struct HomeView: View {
         return tweak
     }
 
-    private var activeConfiguration: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader("Staged configuration", detail: "\(selectedTweaks.count)")
-            VStack(spacing: 0) {
-                ForEach(Array(selectedTweaks.prefix(4).enumerated()), id: \.element.id) { index, tweak in
-                    HStack(spacing: 12) {
-                        Image(systemName: tweak.symbol)
-                            .foregroundStyle(.white)
-                            .frame(width: 24)
-                        Text(tweak.title)
-                        Spacer()
-                        Image(systemName: "checkmark")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(.white)
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .padding(.vertical, 13)
-                    if index < min(selectedTweaks.count, 4) - 1 { Divider().padding(.leading, 36) }
-                }
-                if selectedTweaks.count > 4 {
-                    Text("+ \(selectedTweaks.count - 4) more changes")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 14)
-                }
-            }
-            .padding(.horizontal, 18)
-            .liquidGlass()
-        }
-    }
-
-    struct ToolTile: View {
-        let title: String
-        let detail: String
-        let symbol: String
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 14) {
-                Image(systemName: symbol)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.white)
-                Spacer(minLength: 8)
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-            .frame(maxWidth: .infinity, minHeight: 142, maxHeight: .infinity, alignment: .leading)
-            .padding(16)
-            .background(Color.clear, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .liquidGlass(cornerRadius: 22)
-        }
-    }
-
     private func toggle(_ tweak: Tweak) {
         let willEnable = !tweak.isEnabled
         withAnimation(.snappy) {
             store.setEnabled(willEnable, for: tweak.id)
             configurationID = willEnable && tweak.detail != nil ? tweak.id : nil
         }
-    }
-}
-
-struct TweakCatalogTile: View {
-    let tweak: Tweak
-    let isConfiguring: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Image(systemName: tweak.symbol)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(tweak.isEnabled ? .white : .secondary)
-                Spacer()
-                Image(systemName: tweak.isEnabled ? "checkmark.circle.fill" : "circle")
-                    .font(.caption)
-                    .foregroundStyle(tweak.isEnabled ? .white : Color(uiColor: .tertiaryLabel))
-            }
-            Spacer(minLength: 8)
-            Text(tweak.title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(tweak.isEnabled ? (isConfiguring ? "Configuring" : "Enabled") : tweak.subtitle)
-                .font(.caption)
-                .foregroundStyle(tweak.isEnabled ? .white : .secondary)
-                .lineLimit(2)
-        }
-        // maxHeight lets paired tiles match the tallest in their row, the way
-        // the grid used to. Applied before the padding so the glass background
-        // expands with it.
-        .frame(maxWidth: .infinity, minHeight: 142, maxHeight: .infinity, alignment: .leading)
-        .padding(16)
-        .background(tweak.isEnabled ? .white.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .liquidGlass(cornerRadius: 22)
     }
 }
 
@@ -373,13 +366,13 @@ struct InlineTweakConfiguration: View {
                 }
                 .pickerStyle(.wheel)
                 .frame(height: 138)
-                .liquidGlass()
+                .wsCard(cornerRadius: 16)
             case .textField(let placeholder, let keyboard):
                 TextField(placeholder, text: store.textBinding(for: tweak.id))
                     .keyboardType(keyboard == .numeric ? .numberPad : .default)
                     .textFieldStyle(.roundedBorder)
                     .padding(18)
-                    .liquidGlass()
+                    .wsCard(cornerRadius: 16)
             }
             if let note = tweak.notes {
                 Label(note, systemImage: "exclamationmark.triangle")
@@ -398,30 +391,37 @@ struct ApplyChangesView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                Text("Command").font(.largeTitle.weight(.semibold))
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Review & apply")
+                    .font(.largeTitle.weight(.semibold))
                 Text("Review staged changes before writing to the MobileGestalt cache.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 VStack(spacing: 0) {
                     ForEach(Array(store.tweaks.filter(\.isEnabled).enumerated()), id: \.element.id) { index, tweak in
-                        Label(tweak.title, systemImage: tweak.symbol)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 12)
-                        if index < store.enabledCount - 1 { Divider() }
+                        HStack(spacing: 12) {
+                            Image(systemName: tweak.symbol)
+                                .foregroundStyle(Theme.wsBlue)
+                                .frame(width: 24)
+                            Text(tweak.title)
+                                .font(.body.weight(.medium))
+                            Spacer()
+                        }
+                        .padding(.vertical, 11)
+                        if index < store.enabledCount - 1 { Divider().padding(.leading, 36) }
                     }
                 }
-                .padding(.horizontal, 18)
-                .liquidGlass()
+                .padding(.vertical, 6)
+                .padding(.horizontal, 16)
+                .wsCard(cornerRadius: 18)
                 ActionButton(title: "Apply \(store.enabledCount) changes", systemImage: "bolt.fill", isBusy: store.isBusy, action: apply)
                 Button("Restore pristine backup", role: .destructive) { showRestore = true }
-                    .frame(maxWidth: .infinity)
-                    .glassAction()
+                    .wsAction()
                     .disabled(!store.backup.hasBackup)
             }
             .padding(Theme.pagePadding)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(Theme.page)
         .sheet(isPresented: $showRestore) { RestoreSheet() }
         .alert("Could not apply changes", isPresented: $showErrorAlert) {
             Button("OK", role: .cancel) {}

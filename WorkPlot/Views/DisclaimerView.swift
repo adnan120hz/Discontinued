@@ -13,11 +13,11 @@ struct DisclaimerView: View {
                     Text("⚠️ Before You Continue")
                         .font(.title2.weight(.semibold))
                         .padding(.top, 12)
-                    Text("WorkPlot modifies system behavior and may cause unexpected results.")
+                    Text("WorkSlop modifies system behavior and may cause unexpected results.")
                     Text("Experimental features may cause crashes, instability, loss of functionality, data loss, or other issues with your device.")
-                    Text("Back up your device before using WorkPlot.")
-                    Text("WorkPlot is provided “AS IS” and without warranty, to the maximum extent permitted by applicable law. You are responsible for your device, your data, and anything you choose to do with this software.")
-                    Text("By continuing, you acknowledge these risks and agree to use WorkPlot at your own discretion.")
+                    Text("Back up your device before using WorkSlop.")
+                    Text("WorkSlop is provided “AS IS” and without warranty, to the maximum extent permitted by applicable law. You are responsible for your device, your data, and anything you choose to do with this software.")
+                    Text("By continuing, you acknowledge these risks and agree to use WorkSlop at your own discretion.")
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -32,11 +32,11 @@ struct DisclaimerView: View {
                         .font(.subheadline.weight(.medium))
                         .frame(maxWidth: .infinity)
                 }
-                .glassAction()
+                .wsAction()
                 ActionButton(title: "I understand & Continue", action: accept)
             }
         }
         .padding(Theme.pagePadding)
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(Theme.page)
     }
 }

@@ -50,7 +50,7 @@ struct CarPlayWallpaperView: View {
             }
             .padding(Theme.pagePadding)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(Theme.page)
         .navigationTitle("CarPlay Wallpaper")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { reload() }

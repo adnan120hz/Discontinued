@@ -15,7 +15,8 @@ enum TweakCatalog {
         SystemTweaks.all +
         LiquidGlassTweaks.all +
         IPadTweaks.all +
-        IntelligenceTweaks.all
+        IntelligenceTweaks.all +
+        AirLiftTweaks.all
 
     /// Tweaks whose `platform` gate matches the running device's idiom.
     /// This is what `GestaltStore` loads — a tweak gated to `.iOSOnly`

@@ -51,7 +51,7 @@ struct RestoreResult: Equatable {
 @MainActor
 final class GestaltStore: ObservableObject {
 
-    @Published var tweaks: [Tweak] = TweakCatalog.available()
+    @Published var tweaks: [Tweak] = []
     @Published private(set) var isBusy = false
     @Published private(set) var lastApply: ApplyResult?
     @Published private(set) var lastRestore: RestoreResult?
@@ -81,6 +81,9 @@ final class GestaltStore: ObservableObject {
     }
 
     init() {
+        // iOS-gated tweaks (e.g. Liquid Glass options) are only *offered* on
+        // the versions they support — see Tweak.isSupportedOnCurrentOS().
+        tweaks = TweakCatalog.available().filter { $0.isSupportedOnCurrentOS() }
         loadTweakState()
     }
 
@@ -204,6 +207,91 @@ final class GestaltStore: ObservableObject {
         isDeviceSpoofed = reported != nil && reported != AIRegionProfile.machineIdentifier
     }
 
+    // MARK: Preference-plist writes
+
+    /// Candidate on-device locations for each preference domain, in probe
+    /// order. The GlobalPreferences path is the HomeDomain copy GoldenNugget
+    /// mirrors into so tweaks survive the NSGlobalDomain search chain; the
+    /// SpringBoard candidates are `SpringBoardPlist.candidatePaths`
+    /// (lowercase "springboard" — that is the real on-device filename).
+    private static func preferencePlistPaths(for domain: PlistDomain) -> [String] {
+        switch domain {
+        case .globalPreferences:
+            return [
+                "/var/mobile/Library/Preferences/.GlobalPreferences.plist",
+                "/private/var/mobile/Library/Preferences/.GlobalPreferences.plist",
+            ]
+        case .springBoard:
+            return SpringBoardPlist.candidatePaths
+        }
+    }
+
+    /// True when two plist scalars are equal (bridged through NSObject).
+    private static func plistScalarsEqual(_ current: Any?, _ new: Any) -> Bool {
+        guard let current, let newObject = new as? NSObject else { return false }
+        return (current as? NSObject)?.isEqual(newObject) ?? false
+    }
+
+    /// Applies one tweak's `PlistModification`s to every reachable copy of
+    /// the target preference files: enabled writes the value, disabled
+    /// removes the key. Each file is merged (unrelated keys are preserved),
+    /// serialized in its original format, and written with the same
+    /// probe + bad_query lease + verified in-place write that
+    /// `SpringBoardPlist.setSuppressed` uses — a plain
+    /// `FileSystemAccessor.writePlist` createFile cannot survive the sandbox
+    /// escape (EPERM without the lease), so the lease path is used instead.
+    /// Returns the number of files actually changed.
+    @discardableResult
+    private static func applyPlistModifications(_ mods: [PlistModification],
+                                               enabled: Bool,
+                                               warnings: inout [String]) -> Int {
+        var changed = 0
+        let byDomain = Dictionary(grouping: mods, by: \.domain)
+        for (domain, entries) in byDomain {
+            var reachedAny = false
+            for path in preferencePlistPaths(for: domain) {
+                guard let data = FileManager.default.contents(atPath: path) else { continue }
+                var format = PropertyListSerialization.PropertyListFormat.binary
+                guard var plist = (try? PropertyListSerialization.propertyList(
+                    from: data, options: [], format: &format)) as? [String: Any] else { continue }
+                reachedAny = true
+                var dirty = false
+                for entry in entries {
+                    if enabled {
+                        switch entry.value {
+                        case .remove, .keepCurrent:
+                            break
+                        default:
+                            let newValue = entry.value.plistObject
+                            if !plistScalarsEqual(plist[entry.key], newValue) {
+                                plist[entry.key] = newValue
+                                dirty = true
+                            }
+                        }
+                    } else if plist[entry.key] != nil {
+                        plist.removeValue(forKey: entry.key)
+                        dirty = true
+                    }
+                }
+                guard dirty else { continue }
+                do {
+                    let out = try PropertyListSerialization.data(
+                        fromPropertyList: plist, format: format, options: 0)
+                    try BadQueryLeaseScope.withLease(forPath: path) {
+                        try InodeWriter.writeVerifiedInPlace(out, to: path)
+                    }
+                    changed += 1
+                } catch {
+                    warnings.append("\(path): preference write failed — \(error.localizedDescription)")
+                }
+            }
+            if !reachedAny {
+                warnings.append("Preference file for \(domain) is not reachable on this device — skipped.")
+            }
+        }
+        return changed
+    }
+
     // MARK: Engine
 
     /// Reads the live plist, applies every enabled tweak to an in-memory
@@ -218,12 +306,17 @@ final class GestaltStore: ObservableObject {
     /// tweaks staged elsewhere in the app (e.g. the Tweaks console) are left
     /// untouched even if they're currently enabled.
     func apply(only ids: Set<String>) async throws -> ApplyResult {
-        try await apply(only: ids)
+        try await apply(only: ids as Set<String>?)
     }
 
     private func apply(only ids: Set<String>?) async throws -> ApplyResult {
-        let scopedEnabledCount = tweaks.filter { $0.isEnabled && (ids == nil || ids!.contains($0.id)) }.count
-        guard scopedEnabledCount > 0 else { throw ApplyError.noTweaksSelected }
+        let inScope = tweaks.filter { ids == nil || ids!.contains($0.id) }
+        let scopedEnabledCount = inScope.filter(\.isEnabled).count
+        // Toggling a preference-plist tweak OFF still has work to do (its
+        // keys are removed), so a pure "revert" pass is allowed with nothing
+        // enabled.
+        let scopedPlistRevertCount = inScope.filter { !$0.isEnabled && !$0.plistModifications.isEmpty }.count
+        guard scopedEnabledCount > 0 || scopedPlistRevertCount > 0 else { throw ApplyError.noTweaksSelected }
         guard !isBusy else { throw ApplyError.busy }
         isBusy = true
         defer { isBusy = false }
@@ -402,6 +495,21 @@ final class GestaltStore: ObservableObject {
         guard let readback = try? Data(contentsOf: url), readback == newData else {
             try? backup.restoreData().write(to: url, options: [])
             throw ApplyError.writeVerificationFailed
+        }
+
+        // Preference-plist tweaks (Liquid Glass options, supervision text,
+        // …): enabled writes the value, disabled removes the key so toggling
+        // off reverts cleanly. Runs after the MobileGestalt write verified,
+        // so a failed MG apply never leaves half-applied preference state.
+        for tweak in tweaks where (ids == nil || ids!.contains(tweak.id)) && !tweak.plistModifications.isEmpty {
+            guard tweak.isSupportedOnCurrentOS() else {
+                warnings.append("\(tweak.title): not supported on this iOS version, skipped.")
+                continue
+            }
+            let changed = Self.applyPlistModifications(tweak.plistModifications,
+                                                       enabled: tweak.isEnabled,
+                                                       warnings: &warnings)
+            if changed > 0 { applied += 1 }
         }
 
         let result = ApplyResult(

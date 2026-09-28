@@ -24,7 +24,7 @@ struct EligibilityView: View {
                 .padding(.bottom, reachable ? 94 : 24)
             }
             .scrollIndicators(.hidden)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Theme.page)
             if isBusy { ProgressOverlay(message: "Updating eligibility") }
         }
         .navigationTitle("Eligibility")
@@ -72,13 +72,13 @@ struct EligibilityView: View {
             )
         }
         .padding(.horizontal, 18)
-        .liquidGlass()
+        .wsCard()
     }
 
     private var explanation: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("How it works").font(.subheadline.weight(.semibold))
-            Text("WorkPlot merges these answers into the existing eligibility plist. It keeps unrelated state intact and saves the original file before the first change.")
+            Text("WorkSlop merges these answers into the existing eligibility plist. It keeps unrelated state intact and saves the original file before the first change.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -91,7 +91,7 @@ struct EligibilityView: View {
                 .foregroundStyle(.secondary)
             Text("This firmware does not grant write access to the eligibility container.")
                 .font(.headline)
-            Text("Use the Apple Intelligence and Device Spoof capabilities from Console instead.")
+            Text("Use the Apple Intelligence and Device Spoof capabilities from Tweaks instead.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -101,12 +101,12 @@ struct EligibilityView: View {
     private var applyBar: some View {
         HStack(spacing: 12) {
             Button("Restore", role: .destructive, action: reset)
-                .glassAction()
+                .wsAction()
                 .disabled(isBusy)
             Button("Update eligibility", systemImage: "checkmark") { apply() }
                 .font(.body.weight(.semibold))
                 .frame(maxWidth: .infinity)
-                .glassAction(prominent: true)
+                .wsAction(prominent: true)
                 .disabled(isBusy)
         }
         .padding(.horizontal, Theme.pagePadding)

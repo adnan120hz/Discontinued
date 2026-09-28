@@ -14,7 +14,7 @@ struct UnsupportedView: View {
                 .frame(width: 64, height: 64)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             VStack(alignment: .leading, spacing: 8) {
-                Text("WorkPlot cannot run here")
+                Text("WorkSlop cannot run here")
                     .font(.title2.weight(.semibold))
                 Text(reason)
                     .font(.subheadline)
@@ -28,14 +28,14 @@ struct UnsupportedView: View {
                 detail("Latest verified", "27.0 developer beta 4")
             }
             .padding(.horizontal, 18)
-            .liquidGlass()
+            .wsCard()
             Text("Newer firmware patched the ability to modify MobileGestalt.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Spacer()
         }
         .padding(Theme.pagePadding)
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(Theme.page)
     }
 
     private func detail(_ label: String, _ value: String) -> some View {
@@ -81,6 +81,6 @@ struct FeatureUnsupportedView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(Theme.page)
     }
 }

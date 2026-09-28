@@ -44,7 +44,7 @@ struct PosterBoardView: View {
                         locked
                     }
                 }
-                .background(Color(uiColor: .systemGroupedBackground))
+                .background(Theme.page)
                 .navigationTitle("Library")
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
@@ -108,7 +108,7 @@ struct PosterBoardView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
             }
-            .glassAction(prominent: true)
+            .wsAction(prominent: true)
         }
     }
 
@@ -176,7 +176,7 @@ struct PosterBoardView: View {
             }
             .font(.body.weight(.semibold))
             .frame(maxWidth: .infinity)
-            .glassAction(prominent: true)
+            .wsAction(prominent: true)
             .disabled(isBusy)
         }
         .padding(.horizontal, Theme.pagePadding)

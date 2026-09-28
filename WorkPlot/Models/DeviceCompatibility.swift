@@ -2,12 +2,21 @@ import Foundation
 
 // MARK: - Compatibility
 
-/// Supported OS range per the class-13 MobileGestalt bug:
-///   iOS 18.0 ... iOS 27.0 beta 4 (build 24A5390f)
-/// Anything newer than 27.0 beta 4 is patched and unsupported.
+/// Supported OS range for WorkSlop:
+///   iOS 26.6 – 26.7.x  → supported (limited: PosterBoard + dialer via
+///                          bad_query, plus AirLift pairing file writes)
+///   iOS 27.x           → supported (full: bad_query MobileGestalt writes,
+///                          plus AirLift pairing file writes)
+/// Anything below 26.6 or above 27.x is unsupported.
+///
+/// Version gating details live in `WorkSlopSupport`; this enum keeps the
+/// user-facing status/messages.
 enum DeviceCompatibility {
 
-    /// Reference build of the newest verified-supported OS (27.0 beta 4).
+    /// Legacy reference build from the old class-13 matrix (27.0 beta 4).
+    /// Kept for historical context; the current matrix (see `evaluate`)
+    /// treats all 27.x builds as supported. `Build.parse` is still used by
+    /// `WorkSlopSupport` for best-effort build-flavor detection.
     static let newestSupportedBuild = Build(alpha: "A", number: 5390, seed: "f")
 
     struct OSInfo {
@@ -73,33 +82,28 @@ enum DeviceCompatibility {
         return OSInfo(version: version, build: build)
     }
 
-    /// Evaluates support. `build` may be nil; iOS 27 then falls back to
-    /// conservative behavior (treated as unsupported with an explanation).
+    /// Evaluates support against the WorkSlop matrix:
+    /// unsupported below iOS 26.6 or above iOS 27.x; 26.6–26.7.x is
+    /// supported-but-limited; 27.x is fully supported.
     static func evaluate(version: OperatingSystemVersion,
                          build: String?) -> Status {
         let major = version.majorVersion
+        let minor = version.minorVersion
 
-        if major < 26 {
+        if major < 26 || (major == 26 && minor < 6) {
             return .unsupported(reason:
-                "This app requires iOS 26.0 or newer. You are running iOS \(major).")
+                "This app requires iOS 26.6 or newer. You are running iOS \(major).\(minor).")
         }
 
         if major > 27 {
             return .unsupported(reason:
-                "iOS \(major) is patched. The MobileGestalt access used by this app is only verified up to iOS 27.0 beta 4 (build 24A5390f).")
+                "iOS \(major) is not supported. WorkSlop is verified on iOS 26.6 – 26.7.x (PosterBoard + AirLift) and iOS 27.x (bad_query MobileGestalt).")
         }
 
-        if major == 27 {
-            guard let raw = build, let parsed = Build.parse(raw) else {
-                return .unsupported(reason:
-                    "Unable to verify your iOS 27 build. Only up to iOS 27.0 beta 4 (build 24A5390f) is supported; newer builds are patched.")
-            }
-            if parsed > newestSupportedBuild {
-                return .unsupported(reason:
-                    "Your build \(raw) is newer than 27.0 developer beta 4 (24A5390f) and is patched.")
-            }
-        }
-
+        // iOS 26.6–26.7.x → supported (limited).
+        // iOS 27.x        → supported (full bad_query MobileGestalt).
+        // The `build` string is intentionally not used to reject 27.x builds:
+        // see WorkSlopSupport.mobileGestaltAvailable() (fail-open on 27.0).
         return .supported
     }
 
@@ -112,13 +116,13 @@ enum DeviceCompatibility {
 
     // MARK: - Feature gating
 
-    /// Tweaks and Siri AI Setup need iOS 27 for full support. iOS 26.x is
-    /// limited to PosterBoard, which works standalone on both versions.
+    /// Full MobileGestalt tweaks need iOS 27 (bad_query). iOS 26.6–26.7.x is
+    /// limited to PosterBoard + dialer theming and AirLift pairing writes.
     static func fullFeatureStatus(feature: String) -> Status {
-        let version = currentOS().version
-        if version.majorVersion < 27 {
+        guard WorkSlopSupport.mobileGestaltAvailable() else {
+            let label = WorkSlopSupport.deviceLabel()
             return .unsupported(reason:
-                "\(feature) requires iOS 27. You are running iOS \(version.majorVersion).\(version.minorVersion), which currently supports PosterBoard only.")
+                "\(feature) requires iOS 27 with full MobileGestalt access (bad_query). \(label): only PosterBoard, dialer theming and AirLift pairing are available here.")
         }
         return .supported
     }

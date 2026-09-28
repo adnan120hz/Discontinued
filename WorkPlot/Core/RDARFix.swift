@@ -114,6 +114,28 @@ struct RDARFix {
         return outData
     }
 
+    /// Parses a resolution string like "1179x2556" into (width, height).
+    /// Also accepts "1179,2556" and "1179 2556" separators. Both sides must
+    /// be integers inside a sane phone-canvas range (320–4096 px); anything
+    /// else throws an `RDARFixError` with a human-readable message.
+    /// Pure — compiled into Support/RDARFixCheck.swift on macOS for CI.
+    static func parseResolution(_ text: String) throws -> (width: Int, height: Int) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let separators = CharacterSet(charactersIn: "xX, ")
+        let parts = trimmed.components(separatedBy: separators).filter { !$0.isEmpty }
+        guard parts.count == 2,
+              let width = Int(parts[0]),
+              let height = Int(parts[1]) else {
+            throw RDARFixError(message: "Enter a resolution like \"1179x2556\".")
+        }
+        let sane = 320...4096
+        guard sane.contains(width), sane.contains(height) else {
+            throw RDARFixError(message:
+                "Resolution out of range — each side must be 320–4096 px.")
+        }
+        return (width, height)
+    }
+
     /// Copies the stock bytes plus a JSON sidecar into `rootDirectory` once.
     /// Existing backups are never overwritten: the first backup captures the
     /// untouched stock condition. Returns true only when a new backup was
@@ -414,6 +436,15 @@ struct RDARFix {
             try InodeWriter.writeVerifiedInPlace(outData, to: filePath)
             return .applied
         }
+    }
+
+    /// Single-resolution entry point: parses a string like "1179x2556"
+    /// (see `parseResolution(_:)`), then runs the same verified in-place
+    /// patch as `apply(canvasWidth:canvasHeight:)`.
+    @discardableResult
+    static func apply(resolution: String) throws -> RDARFixApplyResult {
+        let (width, height) = try parseResolution(resolution)
+        return try apply(canvasWidth: width, canvasHeight: height)
     }
 
     /// Writes the persisted stock bytes back over the live plist using the

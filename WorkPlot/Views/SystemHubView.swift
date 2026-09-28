@@ -1,11 +1,11 @@
 import SwiftUI
 import UIKit
 
+/// WorkSlop settings hub: a blue identity banner up top, backup status and
+/// tool shortcuts as divided list cards, then credits and thanks.
 struct SystemHubView: View {
     @EnvironmentObject private var store: GestaltStore
     @State private var showRestore = false
-    @State private var showGoldToast = false
-    @State private var showIconSwitcher = false
 
     private var version: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
@@ -14,137 +14,199 @@ struct SystemHubView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    header
-                    status
-                    VStack(alignment: .leading, spacing: 12) {
-                        SectionHeader("Tools")
-                        Button { showRestore = true } label: {
-                            HubToolCard(
-                                title: "Recovery",
-                                detail: store.backup.hasBackup ? "Restore the pristine MobileGestalt backup" : "A backup is created on first apply",
-                                symbol: "arrow.uturn.backward"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    VStack(alignment: .leading, spacing: 12) {
-                        SectionHeader("Application")
-                        NavigationLink { SettingsView() } label: {
-                            HubToolCard(
-                                title: "Preferences",
-                                detail: "PosterBoard access and theme",
-                                symbol: "paintbrush"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        Button { showIconSwitcher = true } label: {
-                            HubToolCard(
-                                title: "App Icon",
-                                detail: "Change the app icon",
-                                symbol: "app"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
+                VStack(alignment: .leading, spacing: 20) {
+                    identityBanner
+                    statusCard
+                    toolsSection
                     credits
+                    attributions
                     thanks
                 }
                 .padding(Theme.pagePadding)
             }
             .scrollIndicators(.hidden)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Theme.page)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
         }
         .sheet(isPresented: $showRestore) { RestoreSheet() }
-        .sheet(isPresented: $showIconSwitcher) { AppIconSwitcherSheet(showDoneButton: true) }
-        .toast(isPresented: $showGoldToast, message: "You've struck a gold!")
     }
 
-    private var header: some View {
+    // MARK: - Identity & status
+
+    private var identityBanner: some View {
         HStack(alignment: .center, spacing: 14) {
             Image("Logo")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 48, height: 48)
+                .frame(width: 52, height: 52)
                 .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .stroke(.white.opacity(0.5), lineWidth: 1.5)
+                )
             VStack(alignment: .leading, spacing: 3) {
-                Text("WorkPlot").font(.title3.weight(.semibold))
-                Text("WorkPlot Toolkit  v\(version)")
+                Text("WorkSlop")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(.white)
+                Text("Gestalt toolkit  v\(version)")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.85))
             }
             Spacer()
+            Image(systemName: "wrench.and.screwdriver.fill")
+                .font(.title2)
+                .foregroundStyle(.white.opacity(0.9))
         }
+        .padding(18)
+        .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: Theme.wsBlue.opacity(0.35), radius: 12, x: 0, y: 4)
     }
 
-    private var status: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Device access")
-                .font(.title3.weight(.semibold))
-            HStack(spacing: 12) {
+    private var statusCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader("Device access")
+            HStack(spacing: 14) {
                 Image(systemName: store.backup.hasBackup ? "checkmark.shield.fill" : "shield")
-                    .foregroundStyle(store.backup.hasBackup ? Theme.affirmative : .white)
+                    .foregroundStyle(store.backup.hasBackup ? Theme.affirmative : Theme.wsBlue)
                     .font(.title2)
-                Text(store.backup.hasBackup ? "Backup is available" : "No backup has been created")
-                    .font(.subheadline.weight(.medium))
+                    .frame(width: 44, height: 44)
+                    .background(Theme.wsBlue.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(store.backup.hasBackup ? "Backup is available" : "No backup has been created")
+                        .font(.subheadline.weight(.semibold))
+                    Text(store.backup.hasBackup ? "Your recovery point is safe." : "One is created automatically on first apply.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
             }
-            .padding(18)
-            .liquidGlass()
+            .padding(.vertical, 6)
+            .padding(.horizontal, 16)
+            .wsCard(cornerRadius: 18)
         }
     }
+
+    // MARK: - Tools
+
+    private var toolsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader("Tools")
+            VStack(spacing: 0) {
+                Button { showRestore = true } label: {
+                    toolRow(
+                        title: "Recovery",
+                        detail: store.backup.hasBackup ? "Restore the pristine MobileGestalt backup" : "A backup is created on first apply",
+                        symbol: "arrow.uturn.backward"
+                    )
+                }
+                .buttonStyle(.plain)
+                Divider().padding(.leading, 58)
+                NavigationLink { SettingsView() } label: {
+                    toolRow(
+                        title: "Preferences",
+                        detail: "PosterBoard access, appearance and backups",
+                        symbol: "paintbrush"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.vertical, 6)
+            .padding(.horizontal, 16)
+            .wsCard(cornerRadius: 18)
+        }
+    }
+
+    private func toolRow(title: String, detail: String, symbol: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: symbol)
+                .font(.title3)
+                .foregroundStyle(.white)
+                .frame(width: 42, height: 42)
+                .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.body.weight(.semibold)).foregroundStyle(.primary)
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 9)
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Credits
 
     private var credits: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             SectionHeader("Credits")
-            credit("Gievano", "WorkPlot Developer", "https://github.com/gievano")
-            credit("Adnan.120hz", "Idea Contributor, and testing during development", "https://github.com/adnan120hz")
-            credit("Ketamine by Nouvborne", "Original app — base framework", "https://github.com/Nouvborne/Ketamine", easterEgg: unlockGoldenK)
-            credit("forcequitOS", "bad_query", "https://github.com/forcequitOS")
-            credit("0xjohnnydev", "FilzaSlop / class-13 research", "https://github.com/0xjohnnydev")
-            credit("leminlimez", "Nugget & GestaltEdit", "https://github.com/leminlimez")
-            credit("rooootdev", "neospring (respring)", "https://github.com/rooootdev", easterEgg: {
-                RespringHelper.shared.trigger()
-            })
-            credit("frs0n", "Placard", "https://github.com/frs0n")
+            VStack(spacing: 0) {
+                credit("Adnan.120hz", "Owner", "https://github.com/adnan120hz")
+                Divider().padding(.leading, 16)
+                creditDual(
+                    name: "Adnan.120hz & Gievano",
+                    role: "WorkPlot Based apps development",
+                    links: [
+                        ("github.com/adnan120hz", "https://github.com/adnan120hz"),
+                        ("github.com/gievano", "https://github.com/gievano"),
+                    ]
+                )
+                Divider().padding(.leading, 16)
+                reference("Reference: Mond")
+                Divider().padding(.leading, 16)
+                reference("Reference: 3105/erosion")
+            }
+            .padding(.vertical, 4)
+            .wsCard(cornerRadius: 18)
         }
     }
 
-    private var thanks: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionHeader("Big thanks to")
-            thanksRow("Mond", "Supporter")
-            thanksRow("Toto", "Supporter")
-            Text("…and everyone in the WorkPlot community who tested and reported issues.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.top, 2)
+    private var attributions: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader("Upstream & exploit attributions")
+            VStack(spacing: 0) {
+                let rows: [(String, String, String)] = [
+                    ("Gievano", "WorkPlot Developer", "https://github.com/gievano"),
+                    ("Ketamine by Nouvborne", "Original app — base framework", "https://github.com/Nouvborne/Ketamine"),
+                    ("forcequitOS", "bad_query", "https://github.com/forcequitOS"),
+                    ("0xjohnnydev", "FilzaSlop / class-13 research", "https://github.com/0xjohnnydev"),
+                    ("leminlimez", "Nugget & GestaltEdit", "https://github.com/leminlimez"),
+                    ("rooootdev", "neospring (respring)", "https://github.com/rooootdev"),
+                    ("frs0n", "Placard", "https://github.com/frs0n"),
+                ]
+                ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                    if row.0 == "rooootdev" {
+                        credit(row.0, row.1, row.2, easterEgg: {
+                            RespringHelper.shared.trigger()
+                        })
+                    } else {
+                        credit(row.0, row.1, row.2)
+                    }
+                    if index < rows.count - 1 {
+                        Divider().padding(.leading, 16)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+            .wsCard(cornerRadius: 18)
         }
     }
 
-    private func thanksRow(_ name: String, _ role: String) -> some View {
-        HStack {
-            Text(name).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
-            Text(role).font(.caption).foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.vertical, 7)
-    }
-
-    /// `easterEgg`, when set, fires on a long press without blocking the
-    /// row's normal tap-to-open-link behavior (a quick tap still opens
-    /// `url`; only a sustained press triggers it).
+    /// A linked credit row. `easterEgg`, when set, fires on a long press
+    /// without blocking the row's normal tap-to-open-link behavior.
     private func credit(_ name: String, _ role: String, _ url: String, easterEgg: (() -> Void)? = nil) -> some View {
         let row = Link(destination: URL(string: url)!) {
             HStack {
-                Text(name).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
-                Text(role).font(.caption).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                    Text(role).font(.caption).foregroundStyle(.secondary)
+                }
                 Spacer()
-                Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(.tertiary)
+                Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(Theme.wsBlue)
             }
-            .padding(.vertical, 7)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .contentShape(Rectangle())
         }
         return Group {
             if let easterEgg {
@@ -157,35 +219,78 @@ struct SystemHubView: View {
         }
     }
 
-    /// One-time unlock for the hidden "Golden K" icon. Once unlocked this is
-    /// a no-op forever after — no repeat toast, no repeat haptic.
-    private func unlockGoldenK() {
-        guard !AppIconCatalog.isUnlocked("WPWorkplot2") else { return }
-        AppIconCatalog.unlock("WPWorkplot2")
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        showGoldToast = true
-    }
-}
-
-struct HubToolCard: View {
-    let title: String
-    let detail: String
-    let symbol: String
-
-    var body: some View {
-        HStack(spacing: 15) {
-            Image(systemName: symbol)
-                .font(.title3)
-                .foregroundStyle(.white)
-                .frame(width: 30)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.body.weight(.semibold)).foregroundStyle(.primary)
-                Text(detail).font(.caption).foregroundStyle(.secondary)
+    /// A credit row with several link chips under it, for entries that
+    /// point at more than one repository.
+    private func creditDual(name: String, role: String, links: [(label: String, url: String)]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                    Text(role).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
             }
-            Spacer()
-            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+            HStack(spacing: 8) {
+                ForEach(links, id: \.url) { link in
+                    Link(destination: URL(string: link.url)!) {
+                        Label(link.label, systemImage: "link")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.wsBlue)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(
+                                Theme.wsBlue.opacity(0.12),
+                                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(Theme.wsBlue.opacity(0.4), lineWidth: 1)
+                            )
+                    }
+                }
+            }
         }
-        .padding(18)
-        .liquidGlass()
+        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+    }
+
+    /// A plain text reference row with no link.
+    private func reference(_ text: String) -> some View {
+        HStack {
+            Image(systemName: "bookmark")
+                .font(.caption)
+                .foregroundStyle(Theme.wsBlue)
+            Text(text).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
+            Spacer()
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Thanks
+
+    private var thanks: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader("Big thanks to")
+            VStack(alignment: .leading, spacing: 0) {
+                thanksRow("Toto", "Supporter")
+                Text("…and everyone in the WorkSlop community who tested and reported issues.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 16)
+            .wsCard(cornerRadius: 18)
+        }
+    }
+
+    private func thanksRow(_ name: String, _ role: String) -> some View {
+        HStack {
+            Text(name).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
+            Text(role).font(.caption).foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.vertical, 7)
     }
 }

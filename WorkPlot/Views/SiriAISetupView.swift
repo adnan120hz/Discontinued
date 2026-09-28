@@ -52,7 +52,7 @@ struct SiriAISetupView: View {
                     FeatureUnsupportedView(feature: "Siri AI Setup")
                 }
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Theme.page)
             .navigationTitle("Siri AI Setup")
             .navigationBarTitleDisplayMode(.large)
             .task { await store.refreshSpoofState() }
@@ -144,7 +144,7 @@ struct SiriAISetupView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .liquidGlass()
+        .wsCard()
     }
 
     private var modelConfirmation: some View {
@@ -153,20 +153,20 @@ struct SiriAISetupView: View {
                 .font(.subheadline.weight(.medium))
         }
         .padding(18)
-        .liquidGlass()
+        .wsCard()
     }
 
     private var actionBar: some View {
         HStack(spacing: 12) {
             if store.isDeviceSpoofed {
                 Button("Unspoof", action: unspoof)
-                    .glassAction()
+                    .wsAction()
                     .disabled(isBusy)
             }
             Button("Apply", systemImage: "checkmark") { apply() }
                 .font(.body.weight(.semibold))
                 .frame(maxWidth: .infinity)
-                .glassAction(prominent: true)
+                .wsAction(prominent: true)
                 .disabled(isBusy || !canApply)
         }
         .padding(.horizontal, Theme.pagePadding)

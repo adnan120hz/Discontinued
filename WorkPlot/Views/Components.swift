@@ -59,7 +59,7 @@ struct ActionButton: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .glassAction(prominent: true)
+        .wsAction(prominent: true)
         .controlSize(.large)
         .disabled(disabled || isBusy)
     }
@@ -76,7 +76,7 @@ struct ProgressOverlay: View {
                 Text(message).font(.subheadline.weight(.semibold))
             }
             .padding(26)
-            .liquidGlass()
+            .wsCard()
         }
         .transition(.opacity)
     }
@@ -93,7 +93,7 @@ private struct ToastModifier: ViewModifier {
                     .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 20)
                     .padding(.vertical, 14)
-                    .liquidGlass(cornerRadius: 16)
+                    .wsCard(cornerRadius: 16)
                     .padding(.bottom, 24)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .task(id: isPresented) {

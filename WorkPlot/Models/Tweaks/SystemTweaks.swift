@@ -199,5 +199,28 @@ enum SystemTweaks {
                                     subkey: nil, value: .int(1))
             ]
         ),
+        // Lock-screen supervision text. Writes SBShowSupervisionTextOnLockScreen
+        // into the SpringBoard preferences (ported from GoldenNugget's
+        // .springboard spec of the same name); no iOS gate — the key exists on
+        // every supported version. A respring is required to take effect.
+        // NOTE: only the show/hide switch is implemented here. A *custom*
+        // supervision-text string has no verifiable plist key in any
+        // community source checked (Nugget, misakaX, Cowabunga), so it is
+        // deliberately not included — see the worker report.
+        Tweak(
+            id: "supervision-text",
+            title: "Show Supervision Text on Lock Screen",
+            subtitle: "Show the device-supervision text on the Lock Screen. Respring to apply.",
+            category: .system,
+            symbol: "checkmark.shield.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .springBoard,
+                                  key: "SBShowSupervisionTextOnLockScreen",
+                                  value: .bool(true))
+            ],
+            modifications: [],
+        ),
     ]
 }

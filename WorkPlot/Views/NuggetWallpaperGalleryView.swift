@@ -41,7 +41,7 @@ struct NuggetWallpaperGalleryView: View {
                 .padding(Theme.pagePadding)
             }
             .scrollIndicators(.hidden)
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Theme.page)
             .navigationTitle("Download Wallpapers")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
