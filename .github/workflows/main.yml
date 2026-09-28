@@ -40,6 +40,7 @@ jobs:
 
       - name: Build unsigned archive
         run: |
+          set -o pipefail
           xcodebuild archive \
             -project WorkPlot/WorkPlot.xcodeproj \
             -scheme WorkPlot \
@@ -48,7 +49,14 @@ jobs:
             -archivePath "$RUNNER_TEMP/WorkPlot.xcarchive" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log"
+
+      - name: Upload build log (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: ${{ runner.temp }}/xcodebuild.log
 
       - name: Package unsigned IPA
         run: |
