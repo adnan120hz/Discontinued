@@ -80,13 +80,18 @@ private struct NumberedStep: View {
 
 /// AirLift pairing: two flows depending on the iOS version.
 ///
-/// - iOS 27: in-app pairing-code flow — Developer Mode steps, the generated
-///   6-digit code shown big, then Confirm Pairing.
-/// - iOS 26.6–26.7: pairing-file import — the file is generated on a PC via
-///   iDevicePairing / iLoader, then imported here with the document picker.
+/// - iOS 27+: the phone pairs with ITSELF. WorkSlop runs an RPPairing host,
+///   advertises it over Bonjour, and shows a PIN. The user confirms the PIN
+///   in Settings → Privacy & Security → Developer Mode. Writes then go
+///   through the genuine on-device AirLift exploit (no Mac involved).
+/// - iOS 26.6–26.7: manual pairing-file import (file generated on a PC via
+///   iDevicePairing / iLoader). Writes on iOS 26.x go through the bad_query
+///   fallback — that path is NOT AirLift and the UI says so.
 struct AirLiftPairingView: View {
     @ObservedObject private var manager = AirLiftManager.shared
     @State private var showPicker = false
+    @State private var tunnelUp: Bool?
+    @State private var tunnelDetail: String = ""
 
     private var isIOS27: Bool { WorkSlopSupport.isIOS27() }
 
@@ -96,8 +101,9 @@ struct AirLiftPairingView: View {
                 SectionHeader("AirLift Pairing",
                               detail: WorkSlopSupport.deviceLabel())
                 statusCard
+                tunnelCard
                 if isIOS27 {
-                    codeFlowCard
+                    hostFlowCard
                 } else {
                     fileFlowCard
                 }
@@ -105,13 +111,14 @@ struct AirLiftPairingView: View {
                     statusLine(message)
                 }
                 themesCard
-                infoCard
+                disclaimerCard
             }
             .padding(Theme.pagePadding)
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("AirLift Pairing")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear(perform: refreshTunnel)
         .sheet(isPresented: $showPicker) {
             AirLiftDocumentPicker(
                 allowedTypes: [.data],
@@ -122,6 +129,199 @@ struct AirLiftPairingView: View {
                 onCancel: { showPicker = false }
             )
         }
+    }
+
+    // MARK: Status
+
+    private var statusCard: some View {
+        AirLiftCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 14) {
+                    Image(systemName: manager.isPaired ? "link.circle.fill" : "link.circle")
+                        .font(.system(size: 34))
+                        .foregroundStyle(manager.isPaired ? Theme.affirmative : .secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(manager.isPaired ? "Paired" : "Not paired")
+                            .font(.headline)
+                        Text(statusDetail)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                if manager.state == .pairing || manager.pairingStatus != "Not paired" {
+                    Text(manager.pairingStatus)
+                        .font(.footnote)
+                        .foregroundStyle(manager.pairingStatus.hasPrefix("Failed")
+                                         ? Theme.caution : .secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+
+    private var statusDetail: String {
+        if let name = manager.pairedDeviceName {
+            return "This iPhone paired with itself (\(name))."
+        }
+        if let file = manager.importedFile {
+            return "Pairing file: \(file.name)"
+        }
+        if manager.state == .pairing {
+            return "Pairing in progress — follow the steps below."
+        }
+        return "AirLift writes are unavailable until you pair."
+    }
+
+    // MARK: Loopback tunnel
+
+    /// The exploit reaches the phone's own services over a loopback tunnel
+    /// (LocalDevVPN → 10.7.0.1, 127.0.0.1 fallback). This card reports the
+    /// heuristic tunnel state — it is informational, and a down tunnel is
+    /// shown as-is instead of being hidden.
+    private var tunnelCard: some View {
+        AirLiftCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) {
+                    Image(systemName: tunnelUp == true ? "checkmark.shield.fill" : "network.slash")
+                        .foregroundStyle(tunnelUp == true ? Theme.affirmative : Theme.caution)
+                        .font(.title2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Loopback tunnel")
+                            .font(.headline)
+                        Text(tunnelUp == true
+                             ? "A tunnel interface is up — the phone can reach its own services."
+                             : "No tunnel interface detected. AirLift writes will fail until a loopback VPN app (e.g. LocalDevVPN) is active.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Button {
+                        refreshTunnel()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
+                    .font(.footnote)
+                }
+                if !tunnelDetail.isEmpty {
+                    Text(tunnelDetail)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(3)
+                }
+            }
+        }
+    }
+
+    private func refreshTunnel() {
+        // LocalDevVPN exposes the loopback tunnel on 10.7.0.1; the exploit
+        // also tries 127.0.0.1. Report the 10.7.0.1 heuristic.
+        let (vpn, _, detail) = NetworkStatus.summarize(deviceIP: "10.7.0.1")
+        tunnelUp = vpn
+        tunnelDetail = detail
+    }
+
+    // MARK: iOS 27+ — RPPairing host flow
+
+    private var hostFlowCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionHeader("Pair This iPhone With Itself")
+            VStack(alignment: .leading, spacing: 12) {
+                NumberedStep(number: 1, text: "Tap Start Pairing. WorkSlop asks for Local Network permission and starts an on-device pairing host.")
+                NumberedStep(number: 2, text: "Open Settings › Privacy & Security › Developer Mode and choose “Pair with WorkSlop”.")
+                NumberedStep(number: 3, text: "Enter the PIN shown below when the phone asks for it.")
+                NumberedStep(number: 4, text: "Return here — pairing completes automatically and the pairing file is saved in the app.")
+            }
+            if let pin = manager.pairingPIN {
+                VStack(spacing: 6) {
+                    Text("Enter this PIN in Settings")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(pin)
+                        .font(.system(size: 44, weight: .bold, design: .monospaced))
+                        .frame(maxWidth: .infinity)
+                }
+                .padding(.vertical, 12)
+                .background(Color(uiColor: .secondarySystemGroupedBackground),
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            HStack(spacing: 12) {
+                if manager.state == .pairing {
+                    Button("Cancel", role: .cancel) { manager.cancelPairing() }
+                        .buttonStyle(.bordered)
+                } else if manager.isPaired {
+                    Button("Unpair", role: .destructive) { manager.unpair() }
+                        .buttonStyle(.bordered)
+                } else {
+                    ActionButton(title: "Start Pairing", systemImage: "qrcode") {
+                        manager.startPairing()
+                    }
+                }
+            }
+            Divider()
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Already have a pairing file?")
+                    .font(.footnote.weight(.semibold))
+                Text("Drop an existing SideStore, iTunes, AltStore, or Jitterbug lockdown pairing file into WorkSlop's Documents folder, or import one here — it is adopted automatically.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Button(manager.importedFile == nil ? "Import Pairing File" : "Replace Pairing File") {
+                    showPicker = true
+                }
+                .buttonStyle(.bordered)
+                .font(.footnote)
+            }
+        }
+        .padding(18)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: iOS 26.x — manual file import (bad_query fallback, NOT AirLift)
+
+    private var fileFlowCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionHeader("Pairing File Import")
+            Text("On iOS 26.x the on-device AirLift exploit is unavailable. Importing a pairing file unlocks the bad_query fallback writes — that path is not AirLift and is never labeled as such.")
+                .font(.footnote)
+                .foregroundStyle(Theme.caution)
+            VStack(alignment: .leading, spacing: 12) {
+                NumberedStep(number: 1, text: "On your PC or Mac, use iLoader or iDevicePairing to generate a pairing file for this iPhone.")
+                NumberedStep(number: 2, text: "Transfer the pairing file to this iPhone — for example with AirDrop, an email to yourself, or the Files app.")
+                NumberedStep(number: 3, text: "Tap Import Pairing File below and choose the transferred file.")
+                NumberedStep(number: 4, text: "Once imported, fallback writes are unlocked on this iPhone.")
+            }
+            if let file = manager.importedFile {
+                HStack {
+                    Image(systemName: "doc.fill")
+                        .foregroundStyle(Theme.accent)
+                    VStack(alignment: .leading) {
+                        Text(file.name).font(.subheadline.weight(.medium))
+                        Text("\(file.size) bytes • imported \(file.importedAt, style: .date)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Button("Remove", role: .destructive) { manager.removeImportedFile() }
+                        .buttonStyle(.bordered)
+                        .font(.footnote)
+                }
+            }
+            HStack(spacing: 12) {
+                ActionButton(title: manager.importedFile == nil ? "Import Pairing File" : "Replace Pairing File",
+                             systemImage: "square.and.arrow.down") {
+                    showPicker = true
+                }
+                if manager.isPaired {
+                    Button("Unpair", role: .destructive) { manager.unpair() }
+                        .buttonStyle(.bordered)
+                }
+            }
+        }
+        .padding(18)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: Themes & tools
@@ -179,114 +379,6 @@ struct AirLiftPairingView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: Status
-
-    private var statusCard: some View {
-        AirLiftCard {
-            HStack(spacing: 14) {
-                Image(systemName: manager.isPaired ? "link.circle.fill" : "link.circle")
-                    .font(.system(size: 34))
-                    .foregroundStyle(manager.isPaired ? Theme.affirmative : .secondary)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(manager.isPaired ? "Paired" : "Not paired")
-                        .font(.headline)
-                    Text(statusDetail)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-            }
-        }
-    }
-
-    private var statusDetail: String {
-        if let record = manager.pairedRecord {
-            return "\(record.deviceName) • code \(record.code)"
-        }
-        if let file = manager.importedFile {
-            return "Pairing file: \(file.name)"
-        }
-        return "AirLift writes are unavailable until you pair."
-    }
-
-    // MARK: iOS 27 code flow
-
-    private var codeFlowCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionHeader("Pairing Steps")
-            VStack(alignment: .leading, spacing: 12) {
-                NumberedStep(number: 1, text: "Tap Start Pairing below. WorkSlop generates a 6-digit pairing code.")
-                NumberedStep(number: 2, text: "Open Settings > Privacy & Security > Developer Mode > select WorkSlop > Pairing File.")
-                NumberedStep(number: 3, text: "Enter the pairing code shown in WorkSlop.")
-                NumberedStep(number: 4, text: "Tap Confirm Pairing in WorkSlop. Pairing completes automatically.")
-            }
-            if let code = manager.pairingCode {
-                Text(code)
-                    .font(.system(size: 44, weight: .bold, design: .monospaced))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground),
-                                in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            }
-            HStack(spacing: 12) {
-                if manager.state == .pairing {
-                    ActionButton(title: "Confirm Pairing", systemImage: "checkmark.circle.fill") {
-                        manager.confirmPairing()
-                    }
-                    Button("Cancel", role: .cancel) { manager.cancelPairing() }
-                        .buttonStyle(.bordered)
-                } else if manager.isPaired {
-                    Button("Unpair", role: .destructive) { manager.unpair() }
-                        .buttonStyle(.bordered)
-                } else {
-                    ActionButton(title: "Start Pairing", systemImage: "qrcode") {
-                        manager.startPairing()
-                    }
-                }
-            }
-        }
-        .padding(18)
-        .background(Color(uiColor: .tertiarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    // MARK: iOS 26 file flow
-
-    private var fileFlowCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionHeader("Pairing File Import")
-            VStack(alignment: .leading, spacing: 12) {
-                NumberedStep(number: 1, text: "On your PC or Mac, use iLoader or iDevicePairing to generate a pairing file for this iPhone.")
-                NumberedStep(number: 2, text: "Transfer the pairing file to this iPhone — for example with AirDrop, an email to yourself, or the Files app.")
-                NumberedStep(number: 3, text: "Tap Import Pairing File below and choose the transferred file.")
-                NumberedStep(number: 4, text: "Once imported, AirLift writes are unlocked on this iPhone. This import happens only on this screen.")
-            }
-            if let file = manager.importedFile {
-                HStack {
-                    Image(systemName: "doc.fill")
-                        .foregroundStyle(Theme.accent)
-                    VStack(alignment: .leading) {
-                        Text(file.name).font(.subheadline.weight(.medium))
-                        Text("\(file.size) bytes • imported \(file.importedAt, style: .date)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 0)
-                    Button("Remove", role: .destructive) { manager.removeImportedFile() }
-                        .buttonStyle(.bordered)
-                        .font(.footnote)
-                }
-            }
-            ActionButton(title: manager.importedFile == nil ? "Import Pairing File" : "Replace Pairing File",
-                         systemImage: "square.and.arrow.down") {
-                showPicker = true
-            }
-        }
-        .padding(18)
-        .background(Color(uiColor: .tertiarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
     // MARK: Misc
 
     private func statusLine(_ message: String) -> some View {
@@ -297,12 +389,12 @@ struct AirLiftPairingView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var infoCard: some View {
+    private var disclaimerCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionHeader("Info")
-            Text("AirLift pairing enables file writes outside the app sandbox on iOS 26.6–27.x. The full Mac-hosted AirTraffic write path is still being device-tested; today writes go through the on-device bad_query primitive (see AirLiftFileWriter).")
+            SectionHeader("Experimental — read first")
+            Text("AirLift is experimental and not device-verified by us. On iOS 27+ it performs a genuine on-device sandbox escape (the AirTraffic Books-sync path from 0xjohnnydev/airlift, ported via AirCard-iOS): the phone talks to itself over a loopback tunnel. It requires Apple Books installed and opened at least once, a loopback VPN app active, and this iPhone paired with itself. Failures (pairing rejected, tunnel down, Books missing) are reported as-is. You bear all risk.")
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.caution)
         }
         .padding(18)
         .background(Color(uiColor: .tertiarySystemGroupedBackground),

@@ -22,16 +22,22 @@ struct WalletThemeView: View {
     private static let pkpassType =
         UTType(filenameExtension: "pkpass") ?? .data
 
-    // MARK: Destination (NOT device-verified)
+    // MARK: Destination (per AirCard-iOS)
     //
-    /// Staging path for the custom wallet card image.
+    /// Wallet card-art destination root, per AirCard-iOS: the custom image
+    /// is written into `/var/mobile/Library/Passes/Cards/<card-id>.pkpass`,
+    /// where `<card-id>` is the attached card's filename without extension.
     ///
-    /// NOT device-verified: the exact Wallet card-art location on
-    /// iOS 26.6–27.x still needs on-device confirmation. The image is staged
-    /// here so the flow (attach → pick → write) is reviewable end-to-end;
-    /// narrow this path once the real asset location is confirmed on a test
-    /// device.
-    static let walletImageStagingPath = "/var/mobile/Library/Caches/WorkSlopWalletTheme"
+    /// NOT device-verified by us: confirm on a test device that the target
+    /// iOS build reads card art from this location.
+    static let walletCardsRootPath = "/var/mobile/Library/Passes/Cards"
+
+    /// Destination directory for the attached card's artwork.
+    static func cardArtDirectory(forCardNamed cardName: String) -> String {
+        let cardID = (cardName as NSString).deletingPathExtension
+        return (walletCardsRootPath as NSString)
+            .appendingPathComponent("\(cardID).pkpass")
+    }
 
     private var canApply: Bool {
         !manager.requiresAttachedCard && imageData != nil && vpnActive && !isApplying
@@ -45,6 +51,9 @@ struct WalletThemeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 SectionHeader("Wallet Image (AirLift)")
+                if !WorkSlopSupport.isIOS27() {
+                    fallbackNoticeCard
+                }
                 cardAttachCard
                 vpnGateCard
                 imagePickerCard
@@ -80,6 +89,23 @@ struct WalletThemeView: View {
     }
 
     // MARK: Cards
+
+    /// Honest fallback notice: on iOS 26.x the on-device AirLift exploit is
+    /// unavailable, so writes go through the bad_query fallback — never
+    /// labeled as AirLift.
+    private var fallbackNoticeCard: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(Theme.caution)
+                .font(.title2)
+            Text("iOS 26.x fallback: the AirLift exploit needs iOS 27+. On this device, writes go through the bad_query fallback instead — not AirLift.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
 
     private var cardAttachCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -191,7 +217,7 @@ struct WalletThemeView: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.caution)
             } else {
-                Text("Writes the custom image for \(manager.walletCard?.name ?? "the attached card") via AirLiftFileWriter.")
+                Text("Writes the custom image into \(Self.cardArtDirectory(forCardNamed: manager.walletCard?.name ?? "card")) via AirLiftFileWriter.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -210,7 +236,7 @@ struct WalletThemeView: View {
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("Info")
-            Text("Card attachment is persisted across launches (the .pkpass is copied into the app sandbox). The VPN gate is enforced with VPNCheck.requireVPN()-style utun detection (no entitlements needed) and the flow blocks with an explanation when no local dev VPN is active. The custom image is written through AirLiftFileWriter; the exact Wallet card-art path is not device-verified yet (see code comment).")
+            Text("Card attachment is persisted across launches (the .pkpass is copied into the app sandbox). The VPN gate is enforced with VPNCheck.requireVPN()-style utun detection (no entitlements needed) and the flow blocks with an explanation when no local dev VPN is active. The custom image is written through AirLiftFileWriter into the card's .pkpass directory (per AirCard-iOS); the exact card-art location is not device-verified by us (see code comment).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -249,12 +275,13 @@ struct WalletThemeView: View {
         }
         guard canApply,
               let data = imageData,
-              let name = imageName
+              let name = imageName,
+              let card = manager.walletCard
         else { return }
         isApplying = true
         status = nil
         DispatchQueue.global(qos: .userInitiated).async {
-            let dest = (Self.walletImageStagingPath as NSString)
+            let dest = (Self.cardArtDirectory(forCardNamed: card.name) as NSString)
                 .appendingPathComponent(name)
             let message: String
             do {

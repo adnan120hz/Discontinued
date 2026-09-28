@@ -3,7 +3,6 @@ name: Build unsigned IPA
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -14,6 +13,30 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Build AirLift Rust core (aarch64-apple-ios)
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+        run: |
+          rustup target add aarch64-apple-ios
+          cd WorkPlot/AirLift/RustCore
+          cargo build --release --target aarch64-apple-ios
+
+      - name: Package AirliftFFI.xcframework
+        run: |
+          rm -rf WorkPlot/AirLift/RustCore/AirliftFFI.xcframework
+          xcodebuild -create-xcframework \
+            -library WorkPlot/AirLift/RustCore/target/aarch64-apple-ios/release/libairlift_ffi.a \
+            -headers WorkPlot/AirLift/RustCore/include \
+            -output WorkPlot/AirLift/RustCore/AirliftFFI.xcframework
+          # Drop the raw cargo artifacts so Xcode's file-synced groups don't
+          # link the bare static lib in addition to the xcframework.
+          rm -rf WorkPlot/AirLift/RustCore/target
 
       - name: Build unsigned archive
         run: |
@@ -41,21 +64,3 @@ jobs:
         with:
           name: WorkSlop-IPA
           path: ${{ runner.temp }}/WorkSlop.ipa
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download built IPA
-        uses: actions/download-artifact@v4
-        with:
-          name: WorkSlop-IPA
-
-      - name: Attach IPA to GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: WorkSlop.ipa
-          generate_release_notes: true

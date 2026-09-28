@@ -34,6 +34,17 @@
 	<string>public.app-category.developer-tools</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_remotepairing-pairable-host._tcp</string>
+		<string>_workslopprobe._tcp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>WorkSlop advertises an on-device pairing service so this iPhone can pair with itself, and connects to the local lockdown daemon to run the exploit.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchScreen</key>
