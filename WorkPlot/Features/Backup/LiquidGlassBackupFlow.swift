@@ -277,9 +277,9 @@ final class LiquidGlassApplyModel: ObservableObject {
 
     @Published private(set) var isBusy = false
     @Published private(set) var busyTask: BusyTask?
-    @Published private(set) var statusMessage: String?
-    @Published private(set) var warnings: [String] = []
-    @Published private(set) var lastChangedFiles = 0
+    @Published var statusMessage: String?
+    @Published var warnings: [String] = []
+    @Published var lastChangedFiles = 0
     @Published private(set) var backupInfo: LiquidGlassBackupInfo?
     @Published private(set) var canUndoPartial = false
 

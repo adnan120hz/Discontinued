@@ -80,7 +80,7 @@ enum LGManifestStore {
     /// Stable local identifier used in place of the device UDID until the
     /// real channel reports one. Documented, not faked: the working backup
     /// is per-device, and this is the best stable ID available on-device.
-    static var deviceIdentifier: String {
+    nonisolated static var deviceIdentifier: String {
         UIDevice.current.identifierForVendor?.uuidString ?? "device"
     }
 
@@ -199,8 +199,8 @@ enum LGManifestStore {
         var manifest = readWorkingManifest()
 
         // 1. Payload where the fileID says it lives.
-        let fileID = fileID(domain: domain, relativePath: relativePath)
-        let payload = payloadURL(forFileID: fileID, in: deviceDir)
+        let newFileID = fileID(domain: domain, relativePath: relativePath)
+        let payload = payloadURL(forFileID: newFileID, in: deviceDir)
         try fm.createDirectory(at: payload.deletingLastPathComponent(),
                                withIntermediateDirectories: true)
         try contents.write(to: payload, options: .atomic)

@@ -141,7 +141,7 @@ final class AirLiftManager: ObservableObject {
     /// `*.plist` / `*.mobiledevicepairing` / `*.mobilepair` (SideStore,
     /// iTunes, AltStore, Jitterbug exports) and adopts the first non-empty
     /// one.
-    static func pairingFilePath() -> String {
+    nonisolated static func pairingFilePath() -> String {
         let canonical = canonicalPairingPath()
         if nonEmptyFileSize(at: canonical) > 0 { return canonical }
 
