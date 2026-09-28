@@ -7,10 +7,14 @@ import UniformTypeIdentifiers
 /// apply it via `AirLiftFileWriter`.
 ///
 /// Gated on BOTH conditions:
-/// 1. `AirLiftManager` is paired (code flow on iOS 27 / pairing file on iOS 26).
+/// 1. `AirLiftManager` is paired (in-app RPPairing host flow on iOS 27 /
+///    pairing-file import on iOS 26).
 /// 2. `VPNCheck.requireVPN()` passes — the passcode-theme flow writes through
 ///    a local developer VPN tunnel. When no `utun*` interface is up, the UI
 ///    blocks with an explanatory message instead of failing silently.
+///
+/// On iOS 26.x, writes go through the bad_query fallback in
+/// `AirLiftFileWriter` — never presented as AirLift.
 struct PasscodeThemeView: View {
     @ObservedObject private var manager = AirLiftManager.shared
     @State private var showPicker = false
@@ -49,6 +53,9 @@ struct PasscodeThemeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 SectionHeader("Passcode Theme (AirLift)")
+                if !WorkSlopSupport.isIOS27() {
+                    fallbackNoticeCard
+                }
                 gateCard
                 if gate == .open {
                     pickerCard
@@ -75,6 +82,23 @@ struct PasscodeThemeView: View {
     }
 
     // MARK: Gate
+
+    /// Honest fallback notice: on iOS 26.x the on-device AirLift exploit is
+    /// unavailable, so writes go through the bad_query fallback — never
+    /// labeled as AirLift.
+    private var fallbackNoticeCard: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(Theme.caution)
+                .font(.title2)
+            Text("iOS 26.x fallback: the AirLift exploit needs iOS 27+. On this device, writes go through the bad_query fallback instead — not AirLift.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
 
     private enum PasscodeGate: Equatable {
         case open
@@ -104,7 +128,7 @@ struct PasscodeThemeView: View {
             blockingCard(
                 icon: "link.badge.plus",
                 title: "Pairing required",
-                body: "AirLift is not paired. Go to AirLift Pairing first — confirm the pairing code (iOS 27) or import your pairing file (iOS 26.6–26.7) — then come back."
+                body: "AirLift is not paired. Go to AirLift Pairing first — pair this iPhone with itself (iOS 27) or import your pairing file (iOS 26.6–26.7) — then come back."
             )
         case .noVPN(let detail):
             blockingCard(

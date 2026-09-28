@@ -188,6 +188,7 @@ struct SystemHubView: View {
                     ("GoldenNugget Developer", "Liquid Glass tweaks reference", "https://github.com/GoldenNugget-Team/GoldenNugget-mobile"),
                     ("forcequitOS", "bad_query", "https://github.com/forcequitOS"),
                     ("0xjohnnydev", "FilzaSlop / class-13 research", "https://github.com/0xjohnnydev"),
+                    ("Mak5er", "AirCard-iOS — on-device AirLift", "https://github.com/Mak5er/AirCard-iOS"),
                     ("leminlimez", "Nugget & GestaltEdit", "https://github.com/leminlimez"),
                     ("rooootdev", "neospring (respring)", "https://github.com/rooootdev"),
                 ]

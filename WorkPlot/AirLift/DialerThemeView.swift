@@ -334,14 +334,12 @@ struct AirLiftDialerThemeView: View {
     @State private var status: String?
     @State private var isApplying = false
 
-    /// Staging path for the AirLift dialer-theme assets.
+    /// Destination for the AirLift dialer-theme assets, per AirCard-iOS:
+    /// the Phone app's telephony UI asset location.
     ///
-    /// NOT device-verified: the Phone app's on-disk telephony-asset location
-    /// on iOS 27.x still needs on-device confirmation. Files are staged here
-    /// so the flow (version gate → pairing → import → write) is reviewable
-    /// end-to-end; narrow this path once the real location is confirmed on a
-    /// test device.
-    static let airLiftDialerStagingPath = "/var/mobile/Library/Caches/WorkSlopAirLiftDialerTheme"
+    /// NOT device-verified by us: confirm on a test device that the target
+    /// iOS 27.x build reads dialer assets from here.
+    static let airLiftDialerStagingPath = "/var/mobile/Library/Caches/TelephonyUI-10"
 
     private var isAvailableVersion: Bool { airLiftDialerAvailable }
     private var files: [ZipEntry] { entries.filter { !$0.isDirectory } }
@@ -408,7 +406,7 @@ struct AirLiftDialerThemeView: View {
                     .font(.title2)
                 Text("Pairing required").font(.headline)
             }
-            Text("AirLift is not paired. Go to AirLift Pairing first — confirm the pairing code (iOS 27) or import your pairing file (iOS 26.6–26.7) — then come back.")
+            Text("AirLift is not paired. Go to AirLift Pairing first — pair this iPhone with itself (iOS 27) or import your pairing file (iOS 26.6–26.7) — then come back.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -544,22 +542,37 @@ struct AirLiftDialerThemeView: View {
         isApplying = true
         status = nil
         // Off the main thread; AirLiftFileWriter is synchronous file I/O.
+        // Group by parent directory: one AirLift sync session per directory
+        // instead of one per file (each session replays the full tunnel +
+        // Books-sync flow), preserving the zip's folder structure.
         DispatchQueue.global(qos: .userInitiated).async {
             var failures: [String] = []
+            var byDirectory: [String: [(name: String, data: Data)]] = [:]
             for entry in files {
-                let dest = (Self.airLiftDialerStagingPath as NSString)
-                    .appendingPathComponent(entry.name)
+                let parent = ((entry.name as NSString).deletingLastPathComponent as NSString)
+                    .standardizingPath
+                let leaf = (entry.name as NSString).lastPathComponent
+                byDirectory[parent, default: []].append((name: leaf, data: entry.data))
+            }
+            for (parent, group) in byDirectory {
+                let destDir: String
+                if parent.isEmpty || parent == "." {
+                    destDir = Self.airLiftDialerStagingPath
+                } else {
+                    destDir = (Self.airLiftDialerStagingPath as NSString)
+                        .appendingPathComponent(parent)
+                }
                 do {
-                    try AirLiftFileWriter.writeFile(data: entry.data, to: dest)
+                    try AirLiftFileWriter.writeFiles(group, toDirectory: destDir)
                 } catch {
-                    failures.append("\(entry.name): \(error.localizedDescription)")
+                    failures.append("\(parent.isEmpty ? "root" : parent): \(error.localizedDescription)")
                 }
             }
             let message: String
             if failures.isEmpty {
-                message = "Applied \(files.count) files. Respring to take effect."
+                message = "Applied \(files.count) files in \(byDirectory.count) sync sessions. Respring to take effect."
             } else {
-                message = "Failed: \(failures.count) of \(files.count) writes failed. First: \(failures[0])"
+                message = "Failed: \(failures.count) of \(byDirectory.count) directories failed. First: \(failures[0])"
             }
             DispatchQueue.main.async {
                 status = message

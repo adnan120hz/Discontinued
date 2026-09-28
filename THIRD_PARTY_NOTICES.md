@@ -7,6 +7,20 @@ Credit: **Ketamine by Nouvborne**.
 - Repository: https://github.com/Nouvborne/Ketamine
 - GitHub profile: https://github.com/Nouvborne
 
+## AirCard-iOS (Mak5er) — MIT
+
+The on-device AirLift implementation — `WorkPlot/AirLift/RustCore/` (Rust
+RPPairing host + AirTraffic Books-sync exploit FFI), `WorkPlot/AirLift/`
+`GrappaHelper.h/.m`, `NetworkStatus.swift`, and the pairing keep-alive /
+Local Network helpers — is ported from
+[AirCard-iOS](https://github.com/Mak5er/AirCard-iOS) by Mak5er, which itself
+re-implements the [0xjohnnydev/airlift](https://github.com/0xjohnnydev/airlift)
+exploit (MIT, Copyright (c) 2026 Johnny Franks).
+
+The full MIT license text (copyright Johnny Franks, 2026) is preserved in
+[`WorkPlot/AirLift/RustCore/LICENSE`](WorkPlot/AirLift/RustCore/LICENSE).
+MIT is GPL-3.0-compatible; WorkSlop remains GPL-3.0 (see [`LICENSE`](LICENSE)).
+
 ## bad_query (forcequitOS) — GPLv3
 
 WorkPlot incorporates GPLv3-licensed `bad_query` source code from

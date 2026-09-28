@@ -165,10 +165,12 @@ enum WorkSlopSupport {
         }
     }
 
-    /// iOS 26.6 through 27.x: pairing-based file writes.
+    /// iOS 26.6 through 27.x: file writes outside the sandbox.
     ///
-    /// The pairing handshake is version-tolerant across the whole bad_query
-    /// range; the actual write primitive is chosen by `AirLiftFileWriter`.
+    /// iOS 27+ uses the genuine on-device AirLift exploit (the phone pairs
+    /// with itself; see `AirLiftManager` / `AirLiftFileWriter`). iOS 26.6–26.7
+    /// falls back to the bad_query primitive — that path is NOT AirLift and
+    /// the UI never labels it as such.
     static func airLiftAvailable() -> Bool {
         let v = currentVersion
         return isAtLeast(v, major: 26, minor: 6) && v.majorVersion <= 27

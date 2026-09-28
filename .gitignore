@@ -10,6 +10,12 @@ xcuserdata/
 skill-observations/
 *.ipa
 
+# AirLift Rust core build outputs: the xcframework is rebuilt by CI
+# (.github/workflows/main.yml) from WorkPlot/AirLift/RustCore/ on every
+# build; the 100MB+ binary and cargo's target/ dir must never be committed.
+WorkPlot/AirLift/RustCore/AirliftFFI.xcframework/
+WorkPlot/AirLift/RustCore/target/
+
 # Docs (DEVLOG, testing plans) are local artifacts, but README images
 # under docs/assets must ship so the GitHub header renders.
 docs/*
