@@ -120,10 +120,10 @@ struct SystemHubView: View {
                 }
                 .buttonStyle(.plain)
                 Divider().padding(.leading, 58)
-                NavigationLink { UserDataBackupView() } label: {
+                NavigationLink { GestaltBackupFileView() } label: {
                     toolRow(
-                        title: "User Data Backup",
-                        detail: "Back up photos, videos and settings (iOS 27)",
+                        title: "Mobile Gestalt Backup File",
+                        detail: "Create, import and restore MobileGestalt backups (.plist)",
                         symbol: "externaldrive.fill"
                     )
                 }

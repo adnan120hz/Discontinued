@@ -13,8 +13,7 @@ import SwiftUI
 ///
 /// The Backup button here is its own backup task — a "Liquid Glass Backup"
 /// of the liquid-glass preference files only. It is NOT the MobileGestalt
-/// stock snapshot and NOT the User Data Backup (photos, videos, settings);
-/// those are separate backup modes in the Backup feature.
+/// stock snapshot; that is a separate backup mode in the Backup feature.
 ///
 /// Every tweak in this menu needs a FULL REBOOT to take effect — a
 /// respring is not enough. Only PosterBoard tweaks apply with just a
@@ -141,7 +140,7 @@ struct LiquidGlassApplyView: View {
     private var flowCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader("Liquid Glass Backup & Apply")
-            Text("This Backup snapshots the liquid-glass preference files only. It is a separate backup task — not the MobileGestalt stock snapshot and not the User Data Backup (photos, videos, settings).")
+            Text("This Backup snapshots the liquid-glass preference files only. It is a separate backup task — not the MobileGestalt stock snapshot.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
