@@ -34,7 +34,7 @@ struct RestoreSheet: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if let info = store.backup.info {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Recovery point")
+                        Text("MOBILEGESTALT STOCK SNAPSHOT")
                             .font(.caption.weight(.bold))
                             .tracking(0.7)
                             .foregroundStyle(.secondary)

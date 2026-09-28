@@ -40,6 +40,7 @@ enum TweakCategory: String, CaseIterable, Identifiable {
 /// A plist value that can be written into CacheExtra.
 enum MGValue: Equatable {
     case int(Int)
+    case double(Double)
     case string(String)
     case intArray([Int])
     /// A boolean plist value. Used by preference-plist tweaks
@@ -53,6 +54,7 @@ enum MGValue: Equatable {
     var plistObject: Any {
         switch self {
         case .int(let v): return v
+        case .double(let v): return v
         case .string(let v): return v
         case .intArray(let v): return v
         case .bool(let v): return v
@@ -64,8 +66,9 @@ enum MGValue: Equatable {
 // MARK: - Preference-plist modifications (non-MobileGestalt)
 
 /// A system preference domain a tweak can write to. These are plain plist
-/// files — NOT MobileGestalt's CacheExtra — so they take effect after a
-/// respring rather than immediately.
+/// files — NOT MobileGestalt's CacheExtra — so they do not need a new
+/// MobileGestalt cache. Liquid Glass tweaks still need a full reboot to
+/// take effect; a respring is not enough.
 enum PlistDomain: Equatable, Hashable {
     /// `/var/mobile/Library/Preferences/.GlobalPreferences.plist`
     case globalPreferences

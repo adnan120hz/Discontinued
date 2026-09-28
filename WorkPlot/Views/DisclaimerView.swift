@@ -27,7 +27,7 @@ struct DisclaimerView: View {
             }
             .scrollIndicators(.hidden)
             VStack(spacing: 12) {
-                Link(destination: URL(string: "https://github.com/Nouvborne/WorkPlot/blob/main/DISCLAIMER.md")!) {
+                Link(destination: URL(string: "https://github.com/adnan120hz/WorkSlop/blob/main/DISCLAIMER.md")!) {
                     Text("View Full Disclaimer")
                         .font(.subheadline.weight(.medium))
                         .frame(maxWidth: .infinity)
