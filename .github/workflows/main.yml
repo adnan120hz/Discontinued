@@ -34,13 +34,13 @@ jobs:
             "$RUNNER_TEMP/WorkPlot.xcarchive/Products/Applications/WorkPlot.app" \
             "$RUNNER_TEMP/Payload/"
           cd "$RUNNER_TEMP"
-          zip -qry WorkPlot.ipa Payload
+          zip -qry WorkSlop.ipa Payload
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: WorkPlot-IPA
-          path: ${{ runner.temp }}/WorkPlot.ipa
+          name: WorkSlop-IPA
+          path: ${{ runner.temp }}/WorkSlop.ipa
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -52,12 +52,12 @@ jobs:
       - name: Download built IPA
         uses: actions/download-artifact@v4
         with:
-          name: WorkPlot-IPA
+          name: WorkSlop-IPA
 
       - name: Attach IPA to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: WorkPlot.ipa
+          files: WorkSlop.ipa
           generate_release_notes: true
 
   latest-release:
@@ -75,7 +75,7 @@ jobs:
       - name: Download built IPA
         uses: actions/download-artifact@v4
         with:
-          name: WorkPlot-IPA
+          name: WorkSlop-IPA
 
       - name: Prepare dynamic release metadata
         id: meta
@@ -84,7 +84,7 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           SHORT_SHA="${SHA_FULL::7}"
-          echo "title=WorkPlot dev 1.0.${BUILD_NUMBER} (${SHORT_SHA})" >> "$GITHUB_OUTPUT"
+          echo "title=WorkSlop dev 1.0.${BUILD_NUMBER} (${SHORT_SHA})" >> "$GITHUB_OUTPUT"
           BODY_FILE="${RUNNER_TEMP}/release-body.md"
           {
             echo "Automated build from commit \`${SHA_FULL}\` on main."
@@ -113,7 +113,7 @@ jobs:
           tag_name: latest
           name: ${{ steps.meta.outputs.title }}
           body_path: ${{ steps.meta.outputs.body_path }}
-          files: WorkPlot.ipa
+          files: WorkSlop.ipa
           prerelease: true
           make_latest: false
           generate_release_notes: false
