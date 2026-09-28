@@ -2,8 +2,8 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
-/// WorkSlop preferences: appearance, the PosterBoard container connection,
-/// and MobileGestalt backup import/export.
+/// WorkSlop preferences: this device, appearance, the PosterBoard
+/// container connection, and MobileGestalt backup import/export.
 struct SettingsView: View {
     @EnvironmentObject private var store: GestaltStore
     @AppStorage("pbHash") private var pbHash = ""
@@ -21,9 +21,12 @@ struct SettingsView: View {
     @State private var backupErrorMessage = ""
     @State private var showBackupImportedToast = false
 
+    private var os: DeviceCompatibility.OSInfo { DeviceCompatibility.currentInfo }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
+                deviceCard
                 appearance
                 connection
                 backup
@@ -55,15 +58,71 @@ struct SettingsView: View {
         .toast(isPresented: $showBackupImportedToast, message: "Backup imported")
     }
 
+    // MARK: - Shared row styles
+
+    private func iconTile(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Theme.wsBlue)
+            .frame(width: 32, height: 32)
+            .background(Theme.tintWash, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+
+    /// A labeled setting row: icon + title on top, control indented below.
+    private func settingRow<Control: View>(icon: String, title: String, @ViewBuilder control: () -> Control) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                iconTile(icon)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+            }
+            control()
+                .padding(.leading, 44)
+        }
+        .padding(.vertical, 12)
+    }
+
+    private func infoRow(icon: String, title: String, value: String) -> some View {
+        HStack(spacing: 12) {
+            iconTile(icon)
+            Text(title)
+                .font(.subheadline.weight(.medium))
+            Spacer(minLength: 8)
+            Text(value)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
+                .lineLimit(2)
+        }
+        .padding(.vertical, 10)
+    }
+
+    // MARK: - This device
+
+    private var deviceCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader("This device")
+            VStack(spacing: 0) {
+                infoRow(icon: "iphone", title: "Model", value: WorkSlopSupport.deviceLabel())
+                Divider().padding(.leading, 44)
+                infoRow(icon: "apple.logo", title: "iOS version",
+                        value: "\(os.version.majorVersion).\(os.version.minorVersion).\(os.version.patchVersion)")
+                Divider().padding(.leading, 44)
+                infoRow(icon: "number", title: "Build", value: os.build ?? "Unknown")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .wsCard(cornerRadius: 18)
+        }
+    }
+
     // MARK: - Appearance
 
     private var appearance: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader("Appearance")
             VStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Accent color")
-                        .font(.subheadline.weight(.semibold))
+                settingRow(icon: "paintpalette.fill", title: "Accent color") {
                     HStack(spacing: 12) {
                         ForEach(AppAccent.allCases) { accent in
                             Button {
@@ -86,11 +145,8 @@ struct SettingsView: View {
                         }
                     }
                 }
-                .padding(.vertical, 12)
-                Divider()
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Custom color")
-                        .font(.subheadline.weight(.semibold))
+                Divider().padding(.leading, 44)
+                settingRow(icon: "eyedropper.halffull", title: "Custom color") {
                     HStack(spacing: 14) {
                         ColorPicker("", selection: Binding(
                             get: {
@@ -124,11 +180,8 @@ struct SettingsView: View {
                         }
                     }
                 }
-                .padding(.vertical, 12)
-                Divider()
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Appearance mode")
-                        .font(.subheadline.weight(.semibold))
+                Divider().padding(.leading, 44)
+                settingRow(icon: "circle.lefthalf.filled", title: "Appearance mode") {
                     Picker("Mode", selection: $appearanceScheme) {
                         Text("System").tag(0)
                         Text("Light").tag(1)
@@ -136,9 +189,9 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                 }
-                .padding(.vertical, 12)
             }
             .padding(.horizontal, 16)
+            .padding(.vertical, 6)
             .wsCard(cornerRadius: 18)
         }
     }
@@ -148,10 +201,16 @@ struct SettingsView: View {
     private var connection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader("PosterBoard container")
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    iconTile("link")
+                    Text("Container UUID")
+                        .font(.subheadline.weight(.semibold))
+                }
                 TextField("Container UUID", text: $pbHash)
                     .font(.system(.body, design: .monospaced))
                     .textFieldStyle(.roundedBorder)
+                    .padding(.leading, 44)
                 HStack(spacing: 10) {
                     Button("Detect on device", systemImage: "scope", action: detectPosterBoardHash)
                         .wsAction()
@@ -163,10 +222,12 @@ struct SettingsView: View {
                     }
                 }
                 .font(.subheadline.weight(.semibold))
+                .padding(.leading, 44)
                 if !BadQuery.isAvailable {
                     Text("Detection is unavailable on this iOS version.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .padding(.leading, 44)
                 }
             }
             .padding(16)
@@ -185,10 +246,11 @@ struct SettingsView: View {
                         .foregroundStyle(store.backup.hasBackup ? Theme.affirmative : Theme.wsBlue)
                         .font(.title3)
                         .frame(width: 40, height: 40)
-                        .background(Theme.wsBlue.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(Theme.tintWash, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(store.backup.hasBackup ? "Pristine backup available" : "Backup will be created on first apply")
                             .font(.subheadline.weight(.medium))
+                            .lineLimit(2)
                         if let info = store.backup.info {
                             Text("\(info.createdAt.formatted(date: .abbreviated, time: .shortened))  |  \(ByteCountFormatter.string(fromByteCount: Int64(info.byteCount), countStyle: .file))")
                                 .font(.caption)
@@ -199,6 +261,7 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    .fixedSize(horizontal: false, vertical: true)
                 }
                 HStack(spacing: 10) {
                     if store.backup.hasBackup {
@@ -224,12 +287,20 @@ struct SettingsView: View {
     private var supportInfo: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader("Supported iOS")
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Full features need iOS 27.")
-                    .font(.subheadline.weight(.medium))
-                Text("Reads work on any iOS 27 build. Writes depend on the bad_query exploit, which is verified against iOS 27 developer betas 1 to 4.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) {
+                    iconTile("info.circle")
+                    Text("Compatibility")
+                        .font(.subheadline.weight(.semibold))
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Full features need iOS 27.")
+                        .font(.subheadline.weight(.medium))
+                    Text("Reads work on any iOS 27 build. Writes depend on the bad_query exploit, which is verified against iOS 27 developer betas 1 to 4.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.leading, 44)
             }
             .padding(16)
             .wsCard(cornerRadius: 18)

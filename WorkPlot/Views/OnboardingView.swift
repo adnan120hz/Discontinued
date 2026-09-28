@@ -46,10 +46,15 @@ struct OnboardingView: View {
     // MARK: - Chrome
 
     private var topBar: some View {
-        HStack {
-            Text("WorkSlop")
-                .font(.headline)
-                .foregroundStyle(Theme.wsBlue)
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("WorkSlop")
+                    .font(.headline)
+                    .foregroundStyle(Theme.wsBlue)
+                Text("Step \(page + 1) of \(pageCount)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Spacer()
             if page < pageCount - 1 {
                 Button("Skip") { finish() }
@@ -63,26 +68,21 @@ struct OnboardingView: View {
     }
 
     private var bottomBar: some View {
-        HStack {
-            Spacer()
-            Button {
-                if page < pageCount - 1 {
-                    withAnimation(.snappy) { page += 1 }
-                } else {
-                    finish()
-                }
-            } label: {
-                Text(page < pageCount - 1 ? "Next" : "Get Started")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        Button {
+            if page < pageCount - 1 {
+                withAnimation(.snappy) { page += 1 }
+            } else {
+                finish()
             }
-            .buttonStyle(.plain)
-            .frame(maxWidth: 220)
-            Spacer()
+        } label: {
+            Text(page < pageCount - 1 ? "Next" : "Get Started")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
+        .buttonStyle(.plain)
         .padding(.horizontal, Theme.pagePadding)
         .padding(.top, 10)
         .padding(.bottom, 28)
@@ -103,54 +103,56 @@ struct OnboardingView: View {
     }
 
     private func pageHero(symbol: String, title: String, subtitle: String) -> some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             Image(systemName: symbol)
-                .font(.system(size: 34, weight: .semibold))
+                .font(.system(size: 28, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 76, height: 76)
-                .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .shadow(color: Theme.wsBlue.opacity(0.35), radius: 12, x: 0, y: 4)
-                .padding(.top, 18)
+                .frame(width: 64, height: 64)
+                .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .shadow(color: Theme.wsBlue.opacity(0.3), radius: 10, x: 0, y: 4)
+                .padding(.top, 14)
             Text(title)
                 .font(.title2.weight(.bold))
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
             Text(subtitle)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 8)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
-        .padding(.bottom, 8)
+        .padding(.bottom, 6)
     }
 
-    private func infoCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func infoCard<Content: View>(title: String? = nil, titleIcon: String? = nil, titleTint: Color = .primary, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let title {
+                Label(title, systemImage: titleIcon ?? "info.circle")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(titleTint)
+            }
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .wsCard(cornerRadius: 18)
+        .wsCard(cornerRadius: 16)
     }
 
     // MARK: Page 1 — What is WorkSlop + safety
 
     private var welcomePage: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             pageHero(symbol: "flask.fill",
                      title: "Welcome to WorkSlop",
                      subtitle: "An iOS customization toolkit. Stage tweaks, review them, then write them to your device.")
-            infoCard {
-                Text("What it does")
-                    .font(.subheadline.weight(.semibold))
+            infoCard(title: "What it does") {
                 Text("WorkSlop stages changes — MobileGestalt values, preference keys, themes — and applies them with the bad_query exploit and AirLift pairing. Every change is reversible from its backup.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            infoCard {
-                Label("Safety first", systemImage: "exclamationmark.triangle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.caution)
+            infoCard(title: "Safety first", titleIcon: "exclamationmark.triangle.fill", titleTint: Theme.caution) {
                 Text("WorkSlop modifies system files. Apply one change at a time, keep a backup, and never apply tweaks you don't understand. You are responsible for your device and your data.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -161,7 +163,7 @@ struct OnboardingView: View {
     // MARK: Page 2 — iOS support matrix
 
     private var supportMatrixPage: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             pageHero(symbol: "iphone",
                      title: "iOS support matrix",
                      subtitle: "What works depends on your iOS version. Unsupported versions hide tweaks and refuse writes.")
@@ -197,6 +199,7 @@ struct OnboardingView: View {
                 Text(detail)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.vertical, 4)
@@ -205,13 +208,11 @@ struct OnboardingView: View {
     // MARK: Page 3 — AirLift pairing
 
     private var pairingPage: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             pageHero(symbol: "cable.connector",
                      title: "AirLift pairing",
                      subtitle: "Pairing unlocks file writes outside the app sandbox. The steps depend on your iOS version.")
-            infoCard {
-                Text("On iOS 27 — in-app code flow")
-                    .font(.subheadline.weight(.semibold))
+            infoCard(title: "On iOS 27 — in-app code flow") {
                 VStack(alignment: .leading, spacing: 8) {
                     pairingStep(1, "Tap Start Pairing in the AirLift tab. WorkSlop generates a 6-digit pairing code.")
                     pairingStep(2, "Open Settings > Privacy & Security > Developer Mode, select WorkSlop, then Pairing File.")
@@ -219,9 +220,7 @@ struct OnboardingView: View {
                     pairingStep(4, "Tap Confirm Pairing in WorkSlop. Pairing completes automatically.")
                 }
             }
-            infoCard {
-                Text("On iOS 26.6 – 26.7 — pairing-file flow")
-                    .font(.subheadline.weight(.semibold))
+            infoCard(title: "On iOS 26.6 – 26.7 — pairing-file flow") {
                 VStack(alignment: .leading, spacing: 8) {
                     pairingStep(1, "On your PC or Mac, use iLoader or iDevicePairing to generate a pairing file for this iPhone.")
                     pairingStep(2, "Transfer the file to this iPhone — for example with AirDrop, an email to yourself, or the Files app.")
@@ -241,26 +240,23 @@ struct OnboardingView: View {
             Text(text)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     // MARK: Page 4 — Backup & apply
 
     private var backupPage: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             pageHero(symbol: "externaldrive.fill",
                      title: "Backup & apply",
                      subtitle: "Every apply starts from a pristine backup, so any change can be undone exactly.")
-            infoCard {
-                Text("How applying works")
-                    .font(.subheadline.weight(.semibold))
+            infoCard(title: "How applying works") {
                 Text("The first apply snapshots the untouched files. Writes are verified on read-back, and a failed write restores the backup automatically — the device is never left half-modified.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            infoCard {
-                Text("Liquid Glass on iOS 27")
-                    .font(.subheadline.weight(.semibold))
+            infoCard(title: "Liquid Glass on iOS 27") {
                 Text("Uses the full backup flow: full backup → modify → full restore.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -269,9 +265,7 @@ struct OnboardingView: View {
                     .foregroundStyle(Theme.caution)
                     .padding(.top, 2)
             }
-            infoCard {
-                Text("Liquid Glass on iOS 26")
-                    .font(.subheadline.weight(.semibold))
+            infoCard(title: "Liquid Glass on iOS 26") {
                 Text("Uses the partial-restore flow: it applies directly with no backup step, and the last apply can be undone from the same screen.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -282,7 +276,7 @@ struct OnboardingView: View {
     // MARK: Page 5 — Tweak categories
 
     private var categoriesPage: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             pageHero(symbol: "square.grid.2x2.fill",
                      title: "Tweak categories",
                      subtitle: "Pick capabilities in the Tweaks tab, review them, then apply. These are the categories you'll find.")
@@ -325,6 +319,7 @@ struct OnboardingView: View {
                 Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }

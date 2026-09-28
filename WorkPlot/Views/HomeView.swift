@@ -1,14 +1,26 @@
 import SwiftUI
 
-/// WorkSlop tweak browser: a single-column capability list under a solid
-/// blue status banner. Tapping a row toggles the tweak; tweaks with extra
-/// options expand an inline configuration panel under the row.
+/// WorkSlop tweak browser.
+///
+/// Layout: a single-column capability list under a slim status strip. In
+/// portrait the section menu lives in a floating box anchored to the
+/// middle-right edge — items stack downward and labels wrap instead of
+/// truncating. In landscape the menu becomes a horizontal chip rail above
+/// the list. Tapping a row toggles the tweak; tweaks with extra options
+/// expand an inline configuration panel under the row.
 struct HomeView: View {
     @EnvironmentObject private var store: GestaltStore
     /// `nil` selects "All" — every tweak and tool, uncategorized.
     @State private var category: TweakCategory? = .display
     @State private var configurationID: String?
     @State private var searchText = ""
+
+    /// Floating menu geometry (portrait). Content reserves this much
+    /// trailing space so nothing ever slides underneath the menu.
+    private let menuWidth: CGFloat = 148
+    private let menuTrailing: CGFloat = 10
+    private let menuGap: CGFloat = 8
+    private var menuClearance: CGFloat { menuWidth + menuTrailing + menuGap }
 
     private var consoleCategories: [TweakCategory] {
         TweakCategory.allCases.filter { cat in
@@ -25,18 +37,31 @@ struct HomeView: View {
         NavigationStack {
             Group {
                 if DeviceCompatibility.supportsFullFeatureSet {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            statusBanner
-                            categoryRail
-                            catalog
-                            if !selectedTweaks.isEmpty { stagedSection }
-                            respringButton
+                    GeometryReader { geo in
+                        let portrait = geo.size.height >= geo.size.width
+                        ZStack {
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 20) {
+                                    statusStrip
+                                    if !portrait { categoryRail }
+                                    catalog
+                                    if !selectedTweaks.isEmpty { stagedSection }
+                                    respringButton
+                                }
+                                .padding(.horizontal, Theme.pagePadding)
+                                .padding(.trailing, portrait ? menuClearance - Theme.pagePadding : 0)
+                                .padding(.bottom, 32)
+                            }
+                            .scrollIndicators(.hidden)
+                            if portrait {
+                                HStack(spacing: 0) {
+                                    Spacer(minLength: 0)
+                                    floatingMenu
+                                }
+                                .padding(.trailing, menuTrailing)
+                            }
                         }
-                        .padding(.horizontal, Theme.pagePadding)
-                        .padding(.bottom, 32)
                     }
-                    .scrollIndicators(.hidden)
                     .searchable(text: $searchText, prompt: "Search tweaks")
                 } else {
                     FeatureUnsupportedView(feature: "Tweaks")
@@ -48,37 +73,123 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Status banner
+    // MARK: - Status strip
 
-    private var statusBanner: some View {
-        HStack(alignment: .center, spacing: 14) {
-            AppMark(name: "ConsoleGlyph", size: 46, tint: .white)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(store.enabledCount == 0 ? "No changes staged" : "\(store.enabledCount) changes staged")
-                    .font(.headline)
-                    .foregroundStyle(.white)
+    private var statusStrip: some View {
+        HStack(spacing: 12) {
+            Image(systemName: store.enabledCount == 0 ? "square.stack.3d.up" : "square.stack.3d.up.fill")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(stagedTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(2)
                 Text(store.enabledCount == 0 ? "Pick capabilities below to build your setup." : "Review everything before applying.")
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             }
-            Spacer()
+            .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
             NavigationLink { ApplyChangesView() } label: {
-                Label("Review", systemImage: "bolt.horizontal.circle")
+                Text("Review")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.wsBlue)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(.white, in: Capsule())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(Theme.wsBlue, in: Capsule())
             }
             .disabled(store.enabledCount == 0)
-            .opacity(store.enabledCount == 0 ? 0.55 : 1)
+            .opacity(store.enabledCount == 0 ? 0.4 : 1)
         }
-        .padding(16)
-        .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: Theme.wsBlue.opacity(0.35), radius: 12, x: 0, y: 4)
+        .padding(14)
+        .wsCard(cornerRadius: 18)
     }
 
-    // MARK: - Category picker
+    private var stagedTitle: String {
+        switch store.enabledCount {
+        case 0: return "No changes staged"
+        case 1: return "1 change staged"
+        default: return "\(store.enabledCount) changes staged"
+        }
+    }
+
+    // MARK: - Floating section menu (portrait)
+
+    /// SF Symbol per section, shown next to the label in the floating menu.
+    private func symbol(for category: TweakCategory) -> String {
+        switch category {
+        case .display: return "display"
+        case .device: return "iphone"
+        case .system: return "gearshape"
+        case .liquidGlass: return "drop"
+        case .ipad: return "ipad"
+        case .gestalt: return "slider.horizontal.3"
+        case .info: return "info.circle"
+        case .ai: return "brain.head.profile"
+        }
+    }
+
+    /// Floating box anchored middle-right. Items stack downward; labels
+    /// wrap onto multiple lines and are never truncated.
+    private var floatingMenu: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Sections")
+                .font(.caption2.weight(.bold))
+                .tracking(0.7)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.top, 2)
+                .padding(.bottom, 4)
+            menuItem(title: "All", symbol: "square.grid.2x2", isSelected: category == nil) {
+                category = nil
+            }
+            ForEach(consoleCategories) { item in
+                menuItem(title: item.rawValue, symbol: symbol(for: item), isSelected: category == item) {
+                    category = item
+                }
+            }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 6)
+        .frame(width: menuWidth, alignment: .leading)
+        .wsFloat(cornerRadius: 18)
+    }
+
+    private func menuItem(title: String, symbol: String, isSelected: Bool, select: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(.snappy) {
+                select()
+                configurationID = nil
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: symbol)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(isSelected ? .white : Theme.wsBlue)
+                    .frame(width: 20)
+                // No lineLimit: the label wraps instead of truncating.
+                Text(title)
+                    .font(.subheadline.weight(isSelected ? .semibold : .medium))
+                    .foregroundStyle(isSelected ? .white : .primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 2)
+            }
+            .frame(minWidth: 116, maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .background(
+                isSelected ? Theme.wsBlue : Color.clear,
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+
+    // MARK: - Category rail (landscape)
 
     private var categoryRail: some View {
         ScrollView(.horizontal) {
@@ -176,12 +287,12 @@ struct HomeView: View {
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
                 if index < cells.count - 1 {
-                    Divider().padding(.leading, 58)
+                    Divider().padding(.leading, 54)
                 }
             }
         }
         .padding(.vertical, 6)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
         .wsCard(cornerRadius: 18)
     }
 
@@ -190,25 +301,29 @@ struct HomeView: View {
         switch cell {
         case .tweak(let tweak):
             Button { toggle(tweak) } label: {
-                HStack(spacing: 14) {
+                HStack(spacing: 12) {
                     Image(systemName: tweak.symbol)
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.white)
-                        .frame(width: 42, height: 42)
+                        .frame(width: 40, height: 40)
                         .background(
                             tweak.isEnabled ? Theme.wsBlue : Theme.wsBlue.opacity(0.35),
-                            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            in: RoundedRectangle(cornerRadius: 11, style: .continuous)
                         )
                     VStack(alignment: .leading, spacing: 2) {
+                        // Titles wrap (up to two lines) instead of
+                        // truncating mid-word.
                         Text(tweak.title)
                             .font(.body.weight(.semibold))
                             .foregroundStyle(.primary)
+                            .lineLimit(2)
                         Text(tweak.isEnabled && configurationID == tweak.id ? "Configuring" : tweak.subtitle)
                             .font(.caption)
                             .foregroundStyle(tweak.isEnabled ? Theme.wsBlue : .secondary)
-                            .lineLimit(1)
+                            .lineLimit(2)
                     }
-                    Spacer()
+                    .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 6)
                     Image(systemName: tweak.isEnabled ? "checkmark.circle.fill" : "circle")
                         .font(.title3)
                         .foregroundStyle(tweak.isEnabled ? Theme.wsBlue : Color(uiColor: .tertiaryLabel))
@@ -225,22 +340,24 @@ struct HomeView: View {
 
     @ViewBuilder
     private func toolRow(_ tool: ToolDef) -> some View {
-        let label = HStack(spacing: 14) {
+        let label = HStack(spacing: 12) {
             Image(systemName: tool.symbol)
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.white)
-                .frame(width: 42, height: 42)
-                .background(Theme.wsBlue.opacity(0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .frame(width: 40, height: 40)
+                .background(Theme.wsBlue.opacity(0.55), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(tool.title)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(.primary)
+                    .lineLimit(2)
                 Text(tool.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
-            Spacer()
+            .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 6)
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.tertiary)
@@ -289,18 +406,19 @@ struct HomeView: View {
                     HStack(spacing: 12) {
                         Image(systemName: tweak.symbol)
                             .foregroundStyle(.white)
-                            .frame(width: 28, height: 28)
-                            .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .frame(width: 30, height: 30)
+                            .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                         Text(tweak.title)
                             .font(.subheadline.weight(.medium))
-                        Spacer()
+                            .lineLimit(2)
+                        Spacer(minLength: 6)
                         Image(systemName: "checkmark")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(Theme.wsBlue)
                     }
                     .padding(.vertical, 9)
                     if index < min(selectedTweaks.count, 4) - 1 {
-                        Divider().padding(.leading, 40)
+                        Divider().padding(.leading, 42)
                     }
                 }
                 if selectedTweaks.count > 4 {
@@ -312,7 +430,7 @@ struct HomeView: View {
                 }
             }
             .padding(.vertical, 6)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 14)
             .wsCard(cornerRadius: 18)
         }
     }
@@ -323,12 +441,10 @@ struct HomeView: View {
         Button { RespringHelper.shared.trigger() } label: {
             Label("Respring", systemImage: "arrow.clockwise")
                 .font(.body.weight(.semibold))
-                .foregroundStyle(Theme.wsBlue)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 15)
-                .wsCard(cornerRadius: 18)
+                .padding(.vertical, 4)
         }
-        .buttonStyle(.plain)
+        .wsAction()
         .accessibilityHint("Restart SpringBoard")
     }
 
@@ -367,13 +483,13 @@ struct InlineTweakConfiguration: View {
                 }
                 .pickerStyle(.wheel)
                 .frame(height: 138)
-                .wsCard(cornerRadius: 16)
+                .wsCard(cornerRadius: 14)
             case .textField(let placeholder, let keyboard):
                 TextField(placeholder, text: store.textBinding(for: tweak.id))
                     .keyboardType(keyboard == .numeric ? .numberPad : .default)
-                    .textFieldStyle(.roundedBorder)
-                    .padding(18)
-                    .wsCard(cornerRadius: 16)
+                    .textFieldStyle(.plain)
+                    .padding(14)
+                    .wsCard(cornerRadius: 14)
             }
             if let note = tweak.notes {
                 Label(note, systemImage: "exclamationmark.triangle")
@@ -392,12 +508,11 @@ struct ApplyChangesView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("Review & apply")
-                    .font(.largeTitle.weight(.semibold))
+            VStack(alignment: .leading, spacing: 16) {
                 Text("Review staged changes before writing to the MobileGestalt cache.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 VStack(spacing: 0) {
                     ForEach(Array(store.tweaks.filter(\.isEnabled).enumerated()), id: \.element.id) { index, tweak in
                         HStack(spacing: 12) {
@@ -406,14 +521,15 @@ struct ApplyChangesView: View {
                                 .frame(width: 24)
                             Text(tweak.title)
                                 .font(.body.weight(.medium))
-                            Spacer()
+                                .lineLimit(2)
+                            Spacer(minLength: 6)
                         }
                         .padding(.vertical, 11)
                         if index < store.enabledCount - 1 { Divider().padding(.leading, 36) }
                     }
                 }
                 .padding(.vertical, 6)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 14)
                 .wsCard(cornerRadius: 18)
                 ActionButton(title: "Apply \(store.enabledCount) changes", systemImage: "bolt.fill", isBusy: store.isBusy, action: apply)
                 Button("Restore pristine backup", role: .destructive) { showRestore = true }
@@ -423,6 +539,8 @@ struct ApplyChangesView: View {
             .padding(Theme.pagePadding)
         }
         .background(Theme.page)
+        .navigationTitle("Review & Apply")
+        .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showRestore) { RestoreSheet() }
         .alert("Could not apply changes", isPresented: $showErrorAlert) {
             Button("OK", role: .cancel) {}

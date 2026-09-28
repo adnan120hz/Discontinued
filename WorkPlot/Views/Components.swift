@@ -24,16 +24,21 @@ struct SectionHeader: View {
     }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .center, spacing: 8) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(Theme.wsBlue)
+                .frame(width: 4, height: 14)
             Text(title.uppercased())
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.secondary)
                 .tracking(0.8)
-            Spacer()
+                .lineLimit(1)
+            Spacer(minLength: 8)
             if let detail {
                 Text(detail)
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
         .padding(.horizontal, 4)

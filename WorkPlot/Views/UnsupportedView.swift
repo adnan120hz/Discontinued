@@ -6,20 +6,25 @@ struct UnsupportedView: View {
     private var os: DeviceCompatibility.OSInfo { DeviceCompatibility.currentInfo }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 26) {
+        VStack(spacing: 22) {
             Spacer()
             Image("Logo")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 64, height: 64)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            VStack(alignment: .leading, spacing: 8) {
+                .frame(width: 72, height: 72)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 4)
+            VStack(spacing: 8) {
                 Text("WorkSlop cannot run here")
-                    .font(.title2.weight(.semibold))
+                    .font(.title2.weight(.bold))
+                    .multilineTextAlignment(.center)
                 Text(reason)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.horizontal, 8)
             VStack(spacing: 0) {
                 detail("iOS version", "\(os.version.majorVersion).\(os.version.minorVersion).\(os.version.patchVersion)")
                 Divider()
@@ -28,10 +33,13 @@ struct UnsupportedView: View {
                 detail("Latest verified", "27.0 developer beta 4")
             }
             .padding(.horizontal, 18)
-            .wsCard()
+            .padding(.vertical, 4)
+            .wsCard(cornerRadius: 16)
             Text("Newer firmware patched the ability to modify MobileGestalt.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 16)
             Spacer()
         }
         .padding(Theme.pagePadding)
@@ -41,8 +49,9 @@ struct UnsupportedView: View {
     private func detail(_ label: String, _ value: String) -> some View {
         HStack {
             Text(label).foregroundStyle(.secondary)
-            Spacer()
+            Spacer(minLength: 8)
             Text(value).fontWeight(.medium).textSelection(.enabled)
+                .multilineTextAlignment(.trailing)
         }
         .font(.subheadline)
         .padding(.vertical, 14)
@@ -64,19 +73,21 @@ struct FeatureUnsupportedView: View {
     }
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 18) {
             Spacer()
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 40, weight: .semibold))
+                .font(.system(size: 38, weight: .semibold))
                 .foregroundStyle(Theme.caution)
             VStack(spacing: 8) {
                 Text("Unsupported on this iOS version")
                     .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
                 Text(reason)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
         }

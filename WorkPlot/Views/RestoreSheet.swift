@@ -10,30 +10,32 @@ struct RestoreSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 26) {
-                HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 22) {
+                HStack(alignment: .center, spacing: 14) {
                     Image(systemName: done ? "checkmark" : "arrow.counterclockwise")
-                        .font(.title2.weight(.medium))
-                        .foregroundStyle(done ? Theme.affirmative : .white)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(done ? Theme.affirmative : Theme.wsBlue)
                         .frame(width: 52, height: 52)
-                        .background((done ? Theme.affirmative : .white).opacity(0.13), in: Circle())
-                    Spacer()
-                    Text(done ? "COMPLETE" : "RECOVERY")
-                        .font(.caption2.weight(.bold))
-                        .tracking(0.9)
-                        .foregroundStyle(.secondary)
+                        .background(Theme.tintWash, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(done ? "Original file restored" : "Return to baseline")
+                            .font(.title3.weight(.bold))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(done ? "Recovery" : "Recovery point")
+                            .font(.caption.weight(.bold))
+                            .tracking(0.8)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
                 }
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(done ? "Original file restored" : "Return to baseline")
-                        .font(.title2.weight(.semibold))
-                    Text(done ? "Restart your device to complete the recovery." : "Replace the edited MobileGestalt cache with the pristine file captured before your first change.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                Text(done ? "Restart your device to complete the recovery." : "Replace the edited MobileGestalt cache with the pristine file captured before your first change.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let info = store.backup.info {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("RECOVERY POINT")
-                            .font(.caption2.weight(.bold))
+                        Text("Recovery point")
+                            .font(.caption.weight(.bold))
                             .tracking(0.7)
                             .foregroundStyle(.secondary)
                         Text(info.createdAt.formatted(date: .abbreviated, time: .shortened))
@@ -42,12 +44,15 @@ struct RestoreSheet: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(16)
+                    .wsCard(cornerRadius: 16)
                 }
                 if let errorMessage {
-                    Text(errorMessage)
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                         .font(.footnote)
                         .foregroundStyle(Theme.destructive)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 if !done && errorMessage == nil {
