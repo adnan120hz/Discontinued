@@ -65,6 +65,10 @@ struct MainTabView: View {
                 AirLiftPairingView()
             }
             .tabItem { Label("AirLift", systemImage: "cable.connector") }
+            NavigationStack {
+                AppDataView()
+            }
+            .tabItem { Label("App Data", systemImage: "folder") }
             SystemHubView()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
         }
