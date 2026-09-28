@@ -12,6 +12,11 @@ struct AppDataEntry: Identifiable, Equatable {
     let isDirectory: Bool
     /// Byte size for files; -1 when unknown or a directory.
     let size: Int64
+
+    /// Lowercased file extension, e.g. "zip".
+    var fileExtension: String {
+        (name as NSString).pathExtension.lowercased()
+    }
 }
 
 /// An app-data container discovered on the device.
@@ -27,28 +32,40 @@ struct AppDataContainer: Identifiable, Equatable {
 
 // MARK: - Manager
 
-/// File browser / mover / importer for iOS app-data containers, backed by
-/// the bad_query sandbox escape (`BadQuery` + `BadQueryLeaseScope`).
+/// Filza-style file browser for iOS app-data containers, backed by the
+/// bad_query sandbox escape (`BadQuery` + `BadQueryLeaseScope`).
 ///
 /// Every file-system touch runs inside a short-lived bad_query lease for
 /// exactly one operation; the lease is always released, even on failure.
 /// Failures surface through `errorMessage` — nothing is faked or silently
 /// retried.
 ///
+/// Nothing is listed or read until the user taps Run Access: the access
+/// gate performs a real bad_query lease probe and only opens the browser
+/// when it succeeds. A rejected probe is reported as an error, never as
+/// an empty container list.
+///
 /// Honest limits:
 /// - Only works where `WorkSlopSupport.appDataAvailable()` is true AND the
 ///   bad_query route resolves on the running build. Everywhere else the UI
 ///   must show the feature as unavailable, never pretend.
 /// - A lease grants access to the requested path subtree only. Some
-///   system-protected locations refuse reads/writes even with a lease; those
-///   surface as errors, not silent skips.
+///   system-protected locations refuse reads/writes even with a lease;
+///   those surface as errors, not silent skips.
+/// - Modify edits files as UTF-8 text. Binary files cannot be edited
+///   in-app and are reported as such instead of being corrupted.
 /// - Move is a real filesystem rename (same volume). Import copies bytes
 ///   from the picked file into the container — the source file is untouched.
+/// - Export stages the file into the app's own temp directory and hands it
+///   to the share sheet; the copy outside the container is removed when the
+///   device clears temp storage.
 @MainActor
 final class AppDataManager: ObservableObject {
 
     /// File types accepted for import.
-    static let supportedExtensions: Set<String> = ["zip", "passthm", "png", "jpg", "jpeg", "raw"]
+    static let supportedExtensions: Set<String> = [
+        "zip", "passthm", "png", "jpg", "jpeg", "img", "raw", "plist",
+    ]
 
     /// Container roots scanned for app-data containers.
     static let containerRoots = [
@@ -62,6 +79,9 @@ final class AppDataManager: ObservableObject {
     @Published private(set) var currentPath: String = ""
     @Published private(set) var entries: [AppDataEntry] = []
     @Published private(set) var busy = false
+    /// True once the user tapped Run Access and a bad_query lease probe
+    /// succeeded. The file listing only exists behind this gate.
+    @Published private(set) var accessGranted = false
     @Published var status: String = ""
     @Published var errorMessage: String?
 
@@ -96,11 +116,45 @@ final class AppDataManager: ObservableObject {
         return currentPath != root && currentPath.hasPrefix(root)
     }
 
+    // MARK: - Access gate
+
+    /// Runs a real bad_query lease probe against the container roots and,
+    /// on success, opens the browser. The file listing appears only after
+    /// this call succeeds — a failed probe reports an error instead of
+    /// showing an empty list.
+    func requestAccess() {
+        guard isAvailable else { return }
+        busy = true
+        errorMessage = nil
+        defer { busy = false }
+
+        var probeError: String?
+        var leaseWorks = false
+        for root in Self.containerRoots {
+            do {
+                let handle = try BadQuery.consume(path: root, create: true)
+                handle.release()
+                leaseWorks = true
+                break
+            } catch {
+                probeError = error.localizedDescription
+            }
+        }
+
+        if leaseWorks {
+            accessGranted = true
+            loadContainers()
+        } else {
+            errorMessage = "Could not obtain bad_query access to app-data containers"
+                + (probeError.map { ": \($0)." } ?? ".")
+        }
+    }
+
     // MARK: - Containers
 
     /// Enumerates app-data containers under the known roots.
     func loadContainers() {
-        guard isAvailable else { return }
+        guard isAvailable, accessGranted else { return }
         busy = true
         errorMessage = nil
         defer { busy = false }
@@ -246,6 +300,118 @@ final class AppDataManager: ObservableObject {
             list(path: currentPath)
         } catch {
             errorMessage = "Move failed: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - New folder
+
+    /// Creates a folder inside the current directory.
+    func createFolder(named name: String) {
+        guard let root = containerRoot, !currentPath.isEmpty, currentPath.hasPrefix(root) else {
+            errorMessage = "Open a container folder before creating folders."
+            return
+        }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            errorMessage = "Folder name cannot be empty."
+            return
+        }
+        guard !trimmed.contains("/") else {
+            errorMessage = "The folder name must not contain \"/\"."
+            return
+        }
+        let dest = (currentPath as NSString).appendingPathComponent(trimmed)
+        busy = true
+        errorMessage = nil
+        defer { busy = false }
+        do {
+            try BadQueryLeaseScope.withLease(forPath: root) {
+                try fm.createDirectory(atPath: dest, withIntermediateDirectories: false)
+            }
+            status = "Created folder \"\(trimmed)\"."
+            list(path: currentPath)
+        } catch {
+            errorMessage = "Could not create folder: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - View / Modify (text)
+
+    /// Reads a file's raw bytes under a lease, for preview use.
+    func readFileData(_ entry: AppDataEntry) -> Data? {
+        guard let root = containerRoot, !entry.isDirectory, entry.path.hasPrefix(root) else {
+            errorMessage = "Only files inside the open container can be read."
+            return nil
+        }
+        do {
+            return try BadQueryLeaseScope.withLease(forPath: root) {
+                try Data(contentsOf: URL(fileURLWithPath: entry.path))
+            }
+        } catch {
+            errorMessage = "Could not read \"\(entry.name)\": \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    /// Reads a file as UTF-8 text. Returns nil — with a clear message — for
+    /// binary files, which cannot be edited in-app.
+    func readTextFile(_ entry: AppDataEntry) -> String? {
+        guard let data = readFileData(entry) else { return nil }
+        guard let text = String(data: data, encoding: .utf8) else {
+            errorMessage = "\"\(entry.name)\" is binary and cannot be edited as text."
+            return nil
+        }
+        return text
+    }
+
+    /// Overwrites a file with UTF-8 text under a lease.
+    func writeTextFile(_ text: String, to entry: AppDataEntry) {
+        guard let root = containerRoot, !entry.isDirectory, entry.path.hasPrefix(root) else {
+            errorMessage = "Only files inside the open container can be modified."
+            return
+        }
+        busy = true
+        errorMessage = nil
+        defer { busy = false }
+        do {
+            try BadQueryLeaseScope.withLease(forPath: root) {
+                try text.write(toFile: entry.path, atomically: true, encoding: .utf8)
+            }
+            status = "Saved \"\(entry.name)\"."
+            list(path: currentPath)
+        } catch {
+            errorMessage = "Save failed: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Export
+
+    /// Stages a file into the app's own temp directory under a lease and
+    /// returns the staged URL for the share sheet. Returns nil on failure.
+    func exportFile(_ entry: AppDataEntry) -> URL? {
+        guard let root = containerRoot, !entry.isDirectory, entry.path.hasPrefix(root) else {
+            errorMessage = "Only files can be exported."
+            return nil
+        }
+        busy = true
+        errorMessage = nil
+        defer { busy = false }
+        do {
+            let exportDir = fm.temporaryDirectory.appendingPathComponent("appdata-export", isDirectory: true)
+            try fm.createDirectory(at: exportDir, withIntermediateDirectories: true)
+            let destURL = exportDir.appendingPathComponent(entry.name)
+            try BadQueryLeaseScope.withLease(forPath: root) {
+                let data = try Data(contentsOf: URL(fileURLWithPath: entry.path))
+                if fm.fileExists(atPath: destURL.path) {
+                    try fm.removeItem(at: destURL)
+                }
+                try data.write(to: destURL)
+            }
+            status = "Staged \"\(entry.name)\" for export."
+            return destURL
+        } catch {
+            errorMessage = "Export failed: \(error.localizedDescription)"
+            return nil
         }
     }
 
