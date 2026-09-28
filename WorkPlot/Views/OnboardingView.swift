@@ -300,11 +300,11 @@ struct OnboardingView: View {
                     Divider().padding(.leading, 44)
                     categoryRow(symbol: "slider.horizontal.3", name: "Gestalt", detail: "Raw MobileGestalt field editing and presets.")
                     Divider().padding(.leading, 44)
-                    categoryRow(symbol: "brain.head.profile", name: "Intelligence", detail: "Apple Intelligence region setup.")
+                    categoryRow(symbol: "brain.head.profile", name: "Intelligence", detail: "Apple Intelligence enable, region and model tweaks.")
                 }
             }
             infoCard {
-                Label("After applying, respring so the changes take effect.", systemImage: "arrow.clockwise")
+                Label("After applying, reboot so the changes take effect. Only PosterBoard tweaks need just a respring.", systemImage: "arrow.clockwise")
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(.secondary)
             }

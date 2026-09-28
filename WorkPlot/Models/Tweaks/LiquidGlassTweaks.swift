@@ -4,37 +4,41 @@ import Foundation
 ///
 /// Ported from the GoldenNugget-mobile reference
 /// (`Nugget/Core/TweakCatalog.swift`, `section: .liquidGlass` specs, plus the
-/// `.springboard`-section "Hide Search Button on Home Screen" spec).
+/// `.springboard`-section "Hide Search Button on Home Screen" spec;
+/// `Nugget/Core/TweakCompiler.swift` for the merge-into-one-plist apply
+/// semantics — all tweaks here write into the same `.GlobalPreferences.plist`,
+/// so the apply flow merges every enabled key into a single dictionary
+/// before writing, exactly like the reference compiler).
 ///
 /// Unlike the rest of the catalog these do NOT touch MobileGestalt's
-/// CacheExtra — they write plain booleans into `.GlobalPreferences.plist`
-/// and `com.apple.SpringBoard.plist` (see `PlistModification`), applied by
+/// CacheExtra — they write plain values into `.GlobalPreferences.plist`
+/// and `com.apple.springboard.plist` (see `PlistModification`), applied by
 /// `GestaltStore` through the same probe + bad_query lease + verified
 /// in-place write that `SpringBoardPlist` uses. Every tweak here needs a
-/// respring to take effect; disabling a tweak removes its key again.
+/// FULL REBOOT to take effect; disabling a tweak removes its key again.
 enum LiquidGlassTweaks {
     static let all: [Tweak] = [
         Tweak(
             id: "lg-solarium-fallback",
-            title: "Solarium Fallback",
-            subtitle: "Force the older Solarium rendering path. Respring to apply.",
+            title: "Force Solarium Fallback",
+            subtitle: "Forces the older Solarium rendering path instead of the newer one. Useful for troubleshooting or for devices where the current Solarium engine misbehaves on iOS 26. Requires a full reboot to take effect.",
             category: .liquidGlass,
             symbol: "arrow.counterclockwise",
             isRisky: false,
-            notes: "Only offered on iOS 26.5 – 26.6.2.",
+            notes: nil,
             plistModifications: [
                 PlistModification(domain: .globalPreferences,
                                   key: "SolariumForceFallback",
                                   value: .bool(true))
             ],
-            minIOS: "26.5",
-            maxIOS: "26.6.2",
+            minIOS: "26.0",
+            maxIOS: "26.99",
             modifications: [],
         ),
         Tweak(
             id: "lg-ignore-build-check",
-            title: "Ignore App Build Check",
-            subtitle: "Ignore the linked-on SDK version check for Solarium. Respring to apply.",
+            title: "Ignore Solarium Linked-On Check",
+            subtitle: "Ignores the compile-time (linked-on) SDK version check for Solarium, allowing Liquid Glass features to run that would otherwise be gated by the SDK an app was built with. Requires a full reboot to take effect.",
             category: .liquidGlass,
             symbol: "checkmark.seal.fill",
             isRisky: false,
@@ -44,207 +48,13 @@ enum LiquidGlassTweaks {
                                   key: "com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck",
                                   value: .bool(true))
             ],
-            modifications: [],
-        ),
-        Tweak(
-            id: "lg-lock-screen-glass",
-            title: "Disable Liquid Glass on Lock Screen",
-            subtitle: "Keep the old solid Lock Screen look. Respring to apply.",
-            category: .liquidGlass,
-            symbol: "lock.fill",
-            isRisky: false,
-            notes: nil,
-            plistModifications: [
-                PlistModification(domain: .globalPreferences,
-                                  key: "SBDisallowGlassLockScreen",
-                                  value: .bool(true))
-            ],
-            minIOS: "27.0",
-            modifications: [],
-        ),
-        // SpringBoard domain (ported from the reference's .springboard
-        // "Hide Search Button on Home Screen" spec).
-        Tweak(
-            id: "lg-hide-search-button",
-            title: "Disable Search Button on Home Screen",
-            subtitle: "Remove the search button below the Home Screen icons. Respring to apply.",
-            category: .liquidGlass,
-            symbol: "magnifyingglass",
-            isRisky: false,
-            notes: nil,
-            plistModifications: [
-                PlistModification(domain: .springBoard,
-                                  key: "SBHomeScreenShowsSearchAffordance",
-                                  value: .bool(false))
-            ],
-            modifications: [],
-        ),
-        Tweak(
-            id: "lg-glass-buttons",
-            title: "Disallow Glass Buttons",
-            subtitle: "Keep the old solid button style. Respring to apply.",
-            category: .liquidGlass,
-            symbol: "square.on.square",
-            isRisky: false,
-            notes: nil,
-            plistModifications: [
-                PlistModification(domain: .globalPreferences,
-                                  key: "SBDisallowGlassButtons",
-                                  value: .bool(true))
-            ],
-            minIOS: "27.0",
-            modifications: [],
-        ),
-        Tweak(
-            id: "lg-specular-everywhere",
-            title: "Disable Specular Everywhere",
-            subtitle: "Remove the glossy glass highlight from all Liquid Glass surfaces. Respring to apply.",
-            category: .liquidGlass,
-            symbol: "sparkles",
-            isRisky: false,
-            notes: nil,
-            plistModifications: [
-                PlistModification(domain: .globalPreferences,
-                                  key: "SBDisableSpecularEverywhere",
-                                  value: .bool(true))
-            ],
-            minIOS: "27.0",
-            modifications: [],
-        ),
-        Tweak(
-            id: "lg-clock",
-            title: "Disable Liquid Glass Clock",
-            subtitle: "Render the Lock Screen clock in the old solid style. Respring to apply.",
-            category: .liquidGlass,
-            symbol: "clock.fill",
-            isRisky: false,
-            notes: nil,
-            plistModifications: [
-                PlistModification(domain: .globalPreferences,
-                                  key: "SBDisallowGlassTime",
-                                  value: .bool(true))
-            ],
-            minIOS: "26.0",
-            modifications: [],
-        ),
-        Tweak(
-            id: "lg-dock",
-            title: "Disable Liquid Glass Dock",
-            subtitle: "Render the Home Screen dock in the old solid style. Respring to apply.",
-            category: .liquidGlass,
-            symbol: "dock.rectangle",
-            isRisky: false,
-            notes: nil,
-            plistModifications: [
-                PlistModification(domain: .globalPreferences,
-                                  key: "SBDisableGlassDock",
-                                  value: .bool(true))
-            ],
-            minIOS: "26.0",
-            modifications: [],
-        ),
-        Tweak(
-            id: "lg-widget-specular",
-            title: "Disable Widget Specular",
-            subtitle: "Remove the specular highlight from Home Screen widgets. Respring to apply.",
-            category: .liquidGlass,
-            symbol: "square.grid.2x2.fill",
-            isRisky: false,
-            notes: nil,
-            plistModifications: [
-                PlistModification(domain: .globalPreferences,
-                                  key: "SBDisableWidgetSpecular",
-                                  value: .bool(true))
-            ],
-            minIOS: "26.0",
-            modifications: [],
-        ),
-        Tweak(
-            id: "lg-dock-specular",
-            title: "Disable Dock Specular",
-            subtitle: "Remove the specular highlight from the Home Screen dock. Respring to apply.",
-            category: .liquidGlass,
-            symbol: "tray.fill",
-            isRisky: false,
-            notes: nil,
-            plistModifications: [
-                PlistModification(domain: .globalPreferences,
-                                  key: "SBDisableDockSpecular",
-                                  value: .bool(true))
-            ],
-            minIOS: "26.0",
-            modifications: [],
-        ),
-        Tweak(
-            id: "lg-folder-specular",
-            title: "Disable Folder Specular",
-            subtitle: "Remove the specular highlight from Home Screen folders. Respring to apply.",
-            category: .liquidGlass,
-            symbol: "folder.fill",
-            isRisky: false,
-            notes: nil,
-            plistModifications: [
-                PlistModification(domain: .globalPreferences,
-                                  key: "SBDisableFolderSpecular",
-                                  value: .bool(true))
-            ],
-            minIOS: "26.0",
-            modifications: [],
-        ),
-        Tweak(
-            id: "lg-outer-refraction",
-            title: "Disable Outer Refraction",
-            subtitle: "Disable the liquid bending of content at the glass edge. Respring to apply.",
-            category: .liquidGlass,
-            symbol: "drop.fill",
-            isRisky: false,
-            notes: nil,
-            plistModifications: [
-                PlistModification(domain: .globalPreferences,
-                                  key: "SolariumDisableOuterRefraction",
-                                  value: .bool(true))
-            ],
-            minIOS: "26.0",
-            modifications: [],
-        ),
-        // INVERTED: the underlying key is SolariumAllowHDR — turning this
-        // tweak ON writes false (HDR off). The subtitle says so explicitly.
-        Tweak(
-            id: "lg-solarium-hdr",
-            title: "Disable Solarium HDR",
-            subtitle: "ON writes SolariumAllowHDR = false (HDR off). Can fix washed-out Liquid Glass areas. Respring to apply.",
-            category: .liquidGlass,
-            symbol: "sun.max.fill",
-            isRisky: false,
-            notes: nil,
-            plistModifications: [
-                PlistModification(domain: .globalPreferences,
-                                  key: "SolariumAllowHDR",
-                                  value: .bool(false))
-            ],
-            minIOS: "26.0",
-            modifications: [],
-        ),
-        Tweak(
-            id: "lg-specular-motion",
-            title: "Disable Specular Motion",
-            subtitle: "Stop the moving light reflection on the Lock Screen. Respring to apply.",
-            category: .liquidGlass,
-            symbol: "wand.and.stars",
-            isRisky: false,
-            notes: nil,
-            plistModifications: [
-                PlistModification(domain: .globalPreferences,
-                                  key: "SBDisableSpecularEverywhereUsingLSSAssertion",
-                                  value: .bool(true))
-            ],
             minIOS: "26.0",
             modifications: [],
         ),
         Tweak(
             id: "lg-solarium-intelligence",
             title: "Force Solarium Intelligence",
-            subtitle: "Force the experimental adaptive Solarium rendering features. Respring to apply.",
+            subtitle: "Forces the experimental Solarium 'Intelligence' rendering features (adaptive, machine-driven effects) on iOS 27 where they are not enabled by default. Requires a full reboot to take effect.",
             category: .liquidGlass,
             symbol: "brain",
             isRisky: false,
@@ -260,7 +70,7 @@ enum LiquidGlassTweaks {
         Tweak(
             id: "lg-enhanced-speculars",
             title: "Force Enhanced Speculars",
-            subtitle: "Enable the enhanced specular rendering pass. Respring to apply.",
+            subtitle: "Enables the enhanced specular (highlight and reflection) rendering pass that is normally only used on the most capable devices. Requires a full reboot to take effect.",
             category: .liquidGlass,
             symbol: "sparkles",
             isRisky: false,
@@ -276,9 +86,9 @@ enum LiquidGlassTweaks {
         Tweak(
             id: "lg-ui-solarium-fallback",
             title: "UI Solarium Fallback",
-            subtitle: "Force UIKit to use the fallback Solarium path. Respring to apply.",
+            subtitle: "Forces UIKit to use the fallback Solarium path when rendering UI. Can fix broken or glitchy system UI on some iOS 27 devices. Requires a full reboot to take effect.",
             category: .liquidGlass,
-            symbol: "arrow.uturn.left",
+            symbol: "arrow.counterclockwise",
             isRisky: false,
             notes: nil,
             plistModifications: [
@@ -292,7 +102,7 @@ enum LiquidGlassTweaks {
         Tweak(
             id: "lg-ignore-hardware-check",
             title: "Ignore Solarium Hardware Check",
-            subtitle: "Enable Liquid Glass effects on officially unsupported devices. Respring to apply.",
+            subtitle: "Disables the hardware capability check for Solarium, enabling Liquid Glass effects on devices officially considered too weak. Requires a full reboot to take effect.",
             category: .liquidGlass,
             symbol: "cpu.fill",
             isRisky: false,
@@ -308,7 +118,7 @@ enum LiquidGlassTweaks {
         Tweak(
             id: "lg-ignore-opt-out",
             title: "Ignore Solarium Opt-Out",
-            subtitle: "Re-enable Liquid Glass where it is switched off. Respring to apply.",
+            subtitle: "Ignores the system opt-out flag for Solarium, re-enabling Liquid Glass on devices or firmware that have it switched off. Requires a full reboot to take effect.",
             category: .liquidGlass,
             symbol: "eye.slash.fill",
             isRisky: false,
@@ -319,6 +129,1479 @@ enum LiquidGlassTweaks {
                                   value: .bool(true))
             ],
             minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-glass-buttons",
+            title: "Disallow Glass Buttons",
+            subtitle: "Prevents the Liquid Glass material from being applied to system buttons, keeping the old solid button style. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.on.square",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBDisallowGlassButtons",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-lock-screen-glass",
+            title: "Disallow Glass Lock Screen",
+            subtitle: "Prevents the Liquid Glass material from being applied to the Lock Screen, keeping the old lock screen look. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "lock.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBDisallowGlassLockScreen",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-specular-everywhere",
+            title: "Disable Specular Everywhere",
+            subtitle: "Disables the specular (glossy reflection) rendering everywhere, removing the shiny glass highlight from Liquid Glass surfaces. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sparkles",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBDisableSpecularEverywhere",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-clock",
+            title: "Disable Liquid Glass on LS Clock",
+            subtitle: "Renders the Lock Screen clock in the old solid style instead of with the Liquid Glass / dew effect. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "drop.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBDisallowGlassTime",
+                                  value: .bool(true))
+            ],
+            minIOS: "26.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-dock",
+            title: "Disable Liquid Glass on Dock",
+            subtitle: "Renders the Home Screen dock in the old solid style instead of with the Liquid Glass material. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "dock.rectangle",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBDisableGlassDock",
+                                  value: .bool(true))
+            ],
+            minIOS: "26.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-specular-motion",
+            title: "Disable Specular Motion",
+            subtitle: "Disables the motion-based specular effect on the Lock Screen, so the moving light reflection no longer shifts as you tilt your device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "wand.and.stars",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBDisableSpecularEverywhereUsingLSSAssertion",
+                                  value: .bool(true))
+            ],
+            minIOS: "26.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-outer-refraction",
+            title: "Disable Outer Refraction",
+            subtitle: "Disables the outer refraction (the liquid bending of content at the glass edge) for a cleaner, less distorted look. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "drop.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SolariumDisableOuterRefraction",
+                                  value: .bool(true))
+            ],
+            minIOS: "26.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-solarium-hdr",
+            title: "Disable Solarium HDR",
+            subtitle: "Disables HDR tone-mapping in the Solarium renderer. Can fix washed-out or over-bright Liquid Glass areas. Enabled when the switch is OFF. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sun.max.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SolariumAllowHDR",
+                                  value: .bool(false))
+            ],
+            minIOS: "26.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-widget-specular",
+            title: "Disable Widget Specular",
+            subtitle: "Removes the specular (glossy highlight) pass from Home Screen widget icons, so they no longer catch a moving highlight. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.grid.2x2.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBDisableWidgetSpecular",
+                                  value: .bool(true))
+            ],
+            minIOS: "26.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-dock-specular",
+            title: "Disable Dock Specular",
+            subtitle: "Removes the specular highlight from the Home Screen dock, leaving the glass material without its glossy sheen. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "tray.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBDisableDockSpecular",
+                                  value: .bool(true))
+            ],
+            minIOS: "26.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-folder-specular",
+            title: "Disable Folder Specular",
+            subtitle: "Removes the specular highlight from Home Screen folder backgrounds. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "folder.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBDisableFolderSpecular",
+                                  value: .bool(true))
+            ],
+            minIOS: "26.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-exclude-clear-glass-shadows",
+            title: "Exclude All Clear Glass Shadows",
+            subtitle: "Drops every shadow the Clear Glass material casts. Useful when the shadows make light wallpapers look muddy. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "moon.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBExcludeAllClearGlassShadows",
+                                  value: .bool(true))
+            ],
+            minIOS: "26.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-exclude-dock-shadow",
+            title: "Exclude Dock Shadow",
+            subtitle: "Removes the drop shadow under the Home Screen dock. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "dock.rectangle",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBExcludeDockShadow",
+                                  value: .bool(true))
+            ],
+            minIOS: "26.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-exclude-search-shadow",
+            title: "Exclude Search Shadow",
+            subtitle: "Removes the drop shadow under the Home Screen search field. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "moon.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBExcludeSearchShadow",
+                                  value: .bool(true))
+            ],
+            minIOS: "26.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-use-flat-icons-everywhere",
+            title: "Use Flat Icons Everywhere",
+            subtitle: "Draws Home Screen icons in the flat style instead of the glass/3D look. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.grid.2x2",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SBUseFlatIconsEverywhere",
+                                  value: .bool(true))
+            ],
+            minIOS: "26.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-glass-container-logging",
+            title: "Glass Container Logging",
+            subtitle: "Enables glass container debug logging (com.apple.SwiftUI UserDefaults key). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "doc.plaintext",
+            isRisky: true,
+            notes: "Debug/tuning key \u2014 behavior is unverified on-device.",
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "com.apple.SwiftUI.GlassContainerLogging",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-flexi-glass-mac-o-s",
+            title: "Flexi Glass (macOS path)",
+            subtitle: "Enables FlexiGlass on the macOS-side rendering path (com.apple.SwiftUI UserDefaults key). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "drop.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "com.apple.SwiftUI.FlexiGlassMacOS",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-flexi-glass-mac-o-s-pointer",
+            title: "Flexi Glass (macOS Pointer)",
+            subtitle: "Enables the pointer variant of FlexiGlass on the macOS-side path (com.apple.SwiftUI UserDefaults key). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "drop.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "com.apple.SwiftUI.FlexiGlassMacOSPointer",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-invisibility-suppresses-glass",
+            title: "Invisible View Suppresses Glass",
+            subtitle: "When enabled, invisible views suppress the glass effect applied to them (com.apple.UIKit UserDefaults key). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "drop.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "com.apple.UIKit.InvisibilitySuppressesGlass",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-enable-glass-effect-bridge-layers",
+            title: "Enable Glass Effect Bridge Layers",
+            subtitle: "Enables glass effect bridge layers (bare UserDefaults key, read via NSGlobalDomain fallback). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "EnableGlassEffectBridgeLayers",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-enable-gaussian-glass-effect-bridge-layers",
+            title: "Enable Gaussian Glass Bridge Layers",
+            subtitle: "Enables gaussian glass effect bridge layers (bare UserDefaults key, read via NSGlobalDomain fallback). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "EnableGaussianGlassEffectBridgeLayers",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-unified-system-background-colors-enabled",
+            title: "Unified System Background Colors",
+            subtitle: "Enables unified system background colors across the system (bare UserDefaults key, read via NSGlobalDomain fallback). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "paintpalette",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UnifiedSystemBackgroundColorsEnabled",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-unary-glass-container-enabled",
+            title: "Unary Glass Container",
+            subtitle: "Enables the unary glass container (bare UserDefaults key, read via NSGlobalDomain fallback). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "drop.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UnaryGlassContainerEnabled",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-enable-solarium-compact-chrome",
+            title: "Enable Solarium Compact Chrome",
+            subtitle: "Enables compact chrome in the Solarium renderer (UIKit debug cluster, bare UserDefaults key). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "rectangle.dashed",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "EnableSolariumCompactChrome",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-disable-solarium-compact-chrome",
+            title: "Disable Solarium Compact Chrome",
+            subtitle: "Disables compact chrome in the Solarium renderer (UIKit debug cluster, bare UserDefaults key). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "rectangle.dashed",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "DisableSolariumCompactChrome",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-solarium-increased-diffusion",
+            title: "Increased Diffusion",
+            subtitle: "Increases the diffusion / legibility axis of the glass recipe, orthogonal to the tint amount. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "circle.dotted",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SolariumIncreasedDiffusion",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-solarium-use-display-angle",
+            title: "Use Display Angle",
+            subtitle: "Uses the display angle to drive glass highlights. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "drop.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SolariumUseDisplayAngle",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-solarium-tint-mask",
+            title: "Tint Mask",
+            subtitle: "Enables the Solarium tint mask. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "paintbrush",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SolariumTintMask",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-solarium-background-filter",
+            title: "Background Filter",
+            subtitle: "Enables the Solarium background filter. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "drop.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SolariumBackgroundFilter",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-solarium-highlight-white",
+            title: "Highlight White Point",
+            subtitle: "White point of the glass highlight (0.0 to 1.0). Defaults to 1.0 (full white). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sun.max.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SolariumHighlightWhite",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-solarium-live-tuning",
+            title: "Live Tuning",
+            subtitle: "Enables the Solarium live tuning switch — allows real-time glass parameter changes. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "slider.horizontal.3",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SolariumLiveTuning",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-solarium-hierarchical-style",
+            title: "Solarium Hierarchical Style",
+            subtitle: "Sets the Solarium hierarchical glass style level (integer 0–10). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.3.layers",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "SolariumHierarchicalStyle",
+                                  value: .int(1))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-glass-hierarchical-style",
+            title: "Glass Hierarchical Style",
+            subtitle: "Alternative entry for the hierarchical glass style level (integer 0–10). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.3.layers",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "GlassHierarchicalStyle",
+                                  value: .int(1))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-glass-visual-debug",
+            title: "Glass Visual Debug",
+            subtitle: "Overlays glass visual debug information on screen (debug/tuning key). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "ladybug.fill",
+            isRisky: true,
+            notes: "Debug/tuning key \u2014 behavior is unverified on-device.",
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "GlassVisualDebug",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-glass-visual-warnings",
+            title: "Glass Visual Warnings",
+            subtitle: "Shows glass visual warnings overlay (debug/tuning key). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "ladybug.fill",
+            isRisky: true,
+            notes: "Debug/tuning key \u2014 behavior is unverified on-device.",
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "GlassVisualWarnings",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-blur-fill-experiment",
+            title: "Blur Fill Experiment",
+            subtitle: "Enables the blur fill experiment path (debug/tuning key, exact behavior unknown). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "circle.dashed",
+            isRisky: true,
+            notes: "Debug/tuning key \u2014 behavior is unverified on-device.",
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "blurFillExperiment",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-adaptive-glass-hysteresis-dark-range",
+            title: "Adaptive Glass Hysteresis (Dark Range)",
+            subtitle: "Adaptive glass hysteresis dark range — list of floating-point thresholds. Type inferred as Array<Number>; written as text for this test UI, so may be ignored by the framework. Unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "waveform",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "AdaptiveGlassHysteresisDarkRangeArray",
+                                  value: .string(""))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-adaptive-glass-hysteresis-light-range",
+            title: "Adaptive Glass Hysteresis (Light Range)",
+            subtitle: "Adaptive glass hysteresis light range — list of floating-point thresholds. Type inferred as Array<Number>; written as text for this test UI, so may be ignored by the framework. Unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "waveform",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "AdaptiveGlassHysteresisLightRangeArray",
+                                  value: .string(""))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-calistoga-large-refraction",
+            title: "Large Refraction (Calistoga)",
+            subtitle: "Enables the large refraction effect (Calistoga = internal code name for the glass material). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "drop.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "CalistogaLargeRefraction",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-calistoga-regular-clearer",
+            title: "Regular Tier Clearer (Calistoga)",
+            subtitle: "Makes the regular tier glass render clearer (Calistoga). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "drop.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "CalistogaRegularClearer",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-calistoga-backdrop-margin-includes-blur",
+            title: "Backdrop Margin Includes Blur (Calistoga)",
+            subtitle: "Backdrop margin calculation includes the blur extent (Calistoga). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "circle.dashed",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "CalistogaBackdropMarginIncludesBlur",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-calistoga-allow-luma-tracking",
+            title: "Allow Luma Tracking (Calistoga)",
+            subtitle: "Allows luminance (luma) tracking to drive glass adaptation (Calistoga). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sun.min.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "CalistogaAllowLumaTracking",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-calistoga-sidebar-accent-opacity",
+            title: "Sidebar Accent Opacity (Calistoga)",
+            subtitle: "Opacity of the sidebar accent under the glass material (0.0–1.0, Calistoga). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sidebar.left",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "CalistogaSidebarAccentOpacity",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-calistoga-perceptual-backdrop-scale",
+            title: "Perceptual Backdrop Scale (Calistoga)",
+            subtitle: "Perceptual backdrop scale factor for the glass material (0.0–2.0, Calistoga). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "rectangle.3.group",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "CalistogaPerceptualBackdropScale",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-calistoga-keyboard-glass",
+            title: "Keyboard Glass (Calistoga)",
+            subtitle: "Applies the glass material to the keyboard (Calistoga). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "keyboard",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "CalistogaKeyboardGlass",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-calistoga-camera-glass",
+            title: "Camera Glass (Calistoga)",
+            subtitle: "Applies the glass material to the camera surface (Calistoga). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "camera",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "CalistogaCameraGlass",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-specular-highlight-opacity",
+            title: "Floating Specular Highlight Opacity",
+            subtitle: "Opacity of the specular highlight on floating content views (0 = off, 1 = full). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sparkles",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewSpecularHighlightOpacity",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-unfocused-border-opacity",
+            title: "Floating Unfocused Border Opacity",
+            subtitle: "Opacity of the unfocused border on floating content views. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.on.square",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewUnfocusedBorderOpacity",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-unfocused-border-width",
+            title: "Floating Unfocused Border Width",
+            subtitle: "Width of the unfocused border on floating content views. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.on.square",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewUnfocusedBorderWidth",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-enable-background-fills",
+            title: "Floating Background Fills",
+            subtitle: "Enables background fills on floating content views. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.on.square",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewEnableBackgroundFills",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-debug-background-fills",
+            title: "Floating Debug Background Fills",
+            subtitle: "Enables debug background fills on floating content views (debug variant of the above). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.on.square",
+            isRisky: true,
+            notes: "Debug/tuning key \u2014 behavior is unverified on-device.",
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewDebugBackgroundFills",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-punchout-shadow",
+            title: "Floating Punchout Shadow",
+            subtitle: "Enables punchout shadow on floating content views. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "moon.fill",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewPunchoutShadow",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-modify-transform-mode",
+            title: "Floating Transform Mode",
+            subtitle: "Transform mode for floating content view stacking (integer). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.on.square",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewModifyTransformMode",
+                                  value: .int(1))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-override-rotation-x",
+            title: "Floating Override Rotation X",
+            subtitle: "Forced X-axis rotation for floating content views (degrees). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.on.square",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewOverrideRotationX",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-override-rotation-y",
+            title: "Floating Override Rotation Y",
+            subtitle: "Forced Y-axis rotation for floating content views (degrees). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.on.square",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewOverrideRotationY",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-override-translation-x",
+            title: "Floating Override Translation X",
+            subtitle: "Forced X-axis translation for floating content views (points). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.on.square",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewOverrideTranslationX",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-override-translation-y",
+            title: "Floating Override Translation Y",
+            subtitle: "Forced Y-axis translation for floating content views (points). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.on.square",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewOverrideTranslationY",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-modify-rotation-strength",
+            title: "Floating Rotation Strength",
+            subtitle: "Multiplier for the rotation applied to floating content views. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.on.square",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewModifyRotationStrength",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-floating-content-view-modify-translation-strength",
+            title: "Floating Translation Strength",
+            subtitle: "Multiplier for the translation applied to floating content views. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.on.square",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFloatingContentViewModifyTranslationStrength",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-focus-specular-highlight-max-size",
+            title: "Focus Specular Highlight Max Size",
+            subtitle: "Maximum size of the focus specular highlight (0–1). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sparkles",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFocusSpecularHighlightMaxSize",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-focus-specular-highlight-scale-factor",
+            title: "Focus Specular Highlight Scale Factor",
+            subtitle: "Scale factor of the focus specular highlight. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sparkles",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFocusSpecularHighlightScaleFactor",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-focus-specular-highlight-sensitivity",
+            title: "Focus Specular Highlight Sensitivity",
+            subtitle: "Sensitivity of the focus specular highlight to focus changes. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sparkles",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFocusSpecularHighlightSensitivity",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-focus-specular-highlight-normalized-position-x",
+            title: "Focus Specular Highlight Position X",
+            subtitle: "Normalized X position of the focus specular highlight (0–1). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sparkles",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFocusSpecularHighlightNormalizedPositionX",
+                                  value: .double(0.5))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-focus-specular-highlight-normalized-position-y",
+            title: "Focus Specular Highlight Position Y",
+            subtitle: "Normalized Y position of the focus specular highlight (0–1). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sparkles",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumFocusSpecularHighlightNormalizedPositionY",
+                                  value: .double(0.5))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image-rendering-enabled",
+            title: "New Stacked Image Rendering",
+            subtitle: "Enables the new stacked image rendering pipeline for Home Screen icons (3D parallax layering). Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImageRenderingEnabled",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image-filters-enabled",
+            title: "Stacked Image Filters",
+            subtitle: "Enables image filters in the stacked image rendering pipeline. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImageFiltersEnabled",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image3-d-transforms-enabled",
+            title: "Stacked Image 3D Transforms",
+            subtitle: "Enables 3D transforms in the stacked image rendering pipeline. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImage3DTransformsEnabled",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image3-d-transformed-glass-layer",
+            title: "Stacked Image 3D Glass Layer",
+            subtitle: "Enables the 3D-transformed glass layer in the stacked image rendering pipeline. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImage3DTransformedGlassLayer",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image-specular-enabled",
+            title: "Stacked Image Specular",
+            subtitle: "Enables specular highlights on stacked images. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sparkles",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImageSpecularEnabled",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image-specular-opacity",
+            title: "Stacked Image Specular Opacity",
+            subtitle: "Opacity of specular highlights on stacked images (0 = off). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "sparkles",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImageSpecularOpacity",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image-radiosity-enabled",
+            title: "Stacked Image Radiosity",
+            subtitle: "Enables radiosity (color bleed from nearby surfaces) in the stacked image pipeline. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImageRadiosityEnabled",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image-force-adjust-motion-for-size",
+            title: "Stacked Image Adjust Motion for Size",
+            subtitle: "Forces the stacked image motion adjustment to adapt to icon size. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImageForceAdjustMotionForSize",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image-force-default-scale-size-increase",
+            title: "Stacked Image Default Scale Increase",
+            subtitle: "Forces the default scale size increase in the stacked image rendering. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImageForceDefaultScaleSizeIncrease",
+                                  value: .bool(true))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image-inner-parallax-scale",
+            title: "Stacked Image Inner Parallax Scale",
+            subtitle: "Inner parallax scale of the stacked image (0–1). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImageInnerParallaxScale",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image-asymmetric-scale",
+            title: "Stacked Image Asymmetric Scale",
+            subtitle: "Asymmetric scale of the stacked image (controls non-uniform X/Y scaling). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImageAsymmetricScale",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image-progressive-scale",
+            title: "Stacked Image Progressive Scale",
+            subtitle: "Progressive scale of the stacked image across depth layers. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImageProgressiveScale",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image-additional-translation",
+            title: "Stacked Image Additional Translation",
+            subtitle: "Additional translation applied to stacked images (points). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImageAdditionalTranslation",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-new-stacked-image-focused-additional-scale-amount",
+            title: "Stacked Image Focused Scale Amount",
+            subtitle: "Additional scale applied to the focused stacked image. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "viewfinder",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumNewStackedImageFocusedAdditionalScaleAmount",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-default-max-depth",
+            title: "Stacked Container Max Depth",
+            subtitle: "Default maximum depth of the stacked image container (points). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerDefaultMaxDepth",
+                                  value: .double(20.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-default-rotation-x",
+            title: "Stacked Container Default Rotation X",
+            subtitle: "Default X-axis rotation of the stacked image container (degrees). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerDefaultRotationX",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-default-rotation-y",
+            title: "Stacked Container Default Rotation Y",
+            subtitle: "Default Y-axis rotation of the stacked image container (degrees). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerDefaultRotationY",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-default-translation-x",
+            title: "Stacked Container Default Translation X",
+            subtitle: "Default X-axis translation of the stacked image container (points). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerDefaultTranslationX",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-default-translation-y",
+            title: "Stacked Container Default Translation Y",
+            subtitle: "Default Y-axis translation of the stacked image container (points). Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerDefaultTranslationY",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-modify-max-depth-strength",
+            title: "Stacked Container Depth Strength",
+            subtitle: "Multiplier for the maximum depth modification of the stacked image container. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerModifyMaxDepthStrength",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-modify-rotation-strength",
+            title: "Stacked Container Rotation Strength",
+            subtitle: "Multiplier for the rotation modification of the stacked image container. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerModifyRotationStrength",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-modify-translation-strength",
+            title: "Stacked Container Translation Strength",
+            subtitle: "Multiplier for the translation modification of the stacked image container. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerModifyTranslationStrength",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-modify-inner-parallax-scale-strength",
+            title: "Stacked Container Parallax Strength",
+            subtitle: "Multiplier for the inner parallax scale modification of the stacked image container. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerModifyInnerParallaxScaleStrength",
+                                  value: .double(1.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-modify-transform-min-width",
+            title: "Stacked Container Transform Min Width",
+            subtitle: "Minimum width threshold for triggering stacked image container transforms. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerModifyTransformMinWidth",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-modify-transform-max-width",
+            title: "Stacked Container Transform Max Width",
+            subtitle: "Maximum width threshold for stacked image container transforms. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerModifyTransformMaxWidth",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-modify-transform-min-height",
+            title: "Stacked Container Transform Min Height",
+            subtitle: "Minimum height threshold for triggering stacked image container transforms. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerModifyTransformMinHeight",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        Tweak(
+            id: "lg-stacked-image-container-modify-transform-max-height",
+            title: "Stacked Container Transform Max Height",
+            subtitle: "Maximum height threshold for stacked image container transforms. Type inferred; unverified on-device. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "square.stack.3d.up",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .globalPreferences,
+                                  key: "UISolariumStackedImageContainerModifyTransformMaxHeight",
+                                  value: .double(0.0))
+            ],
+            minIOS: "27.0",
+            modifications: [],
+        ),
+        // SpringBoard domain (ported from the reference's .springboard
+        // "Hide Search Button on Home Screen" spec).
+        Tweak(
+            id: "lg-hide-search-button",
+            title: "Hide Search Button on Home Screen",
+            subtitle: "Removes the search button below the icons on the Home Screen (the faint search bar/icon above the Dock). Enabled when the switch is ON. Requires a full reboot to take effect.",
+            category: .liquidGlass,
+            symbol: "magnifyingglass",
+            isRisky: false,
+            notes: nil,
+            plistModifications: [
+                PlistModification(domain: .springBoard,
+                                  key: "SBHomeScreenShowsSearchAffordance",
+                                  value: .bool(false))
+            ],
             modifications: [],
         ),
     ]

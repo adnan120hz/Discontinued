@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Dedicated Disable-Liquid-Glass apply flow with the version-appropriate
-/// backup story:
+/// Liquid Glass tweaks menu: the full GoldenNugget-mobile liquid-glass
+/// tweak set (toggles writing into .GlobalPreferences.plist and the
+/// SpringBoard preferences) with the version-appropriate backup story:
 ///
 /// - iOS 27: full backup → modify → full restore (GoldenNugget-style).
 ///   Backup (blue) snapshots the target preference files first; Apply
@@ -10,7 +11,14 @@ import SwiftUI
 ///   grayed off — only Apply is active — and the flow captures pre-images
 ///   automatically so the last apply can be undone.
 ///
-/// Reached from the Tweaks tab's Liquid Glass category.
+/// The Backup button here is its own backup task — a "Liquid Glass Backup"
+/// of the liquid-glass preference files only. It is NOT the MobileGestalt
+/// stock snapshot and NOT the User Data Backup (photos, videos, settings);
+/// those are separate backup modes in the Backup feature.
+///
+/// Every tweak in this menu needs a FULL REBOOT to take effect — a
+/// respring is not enough. Only PosterBoard tweaks apply with just a
+/// respring.
 struct LiquidGlassApplyView: View {
     @EnvironmentObject private var store: GestaltStore
     @StateObject private var model = LiquidGlassApplyModel()
@@ -25,6 +33,7 @@ struct LiquidGlassApplyView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                disclaimerCard
                 introCard
                 tweaksCard
                 flowCard
@@ -33,7 +42,7 @@ struct LiquidGlassApplyView: View {
         }
         .scrollIndicators(.hidden)
         .background(Theme.page)
-        .navigationTitle("Disable Liquid Glass")
+        .navigationTitle("Liquid Glass Tweaks")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { model.refresh() }
         .overlay {
@@ -43,12 +52,35 @@ struct LiquidGlassApplyView: View {
         }
     }
 
+    // MARK: - Disclaimer
+
+    /// Prominent experimental-feature disclaimer. English, as spec'd.
+    private var disclaimerCard: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "exclamationmark.octagon.fill")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(Theme.destructive)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Experimental — use at your own risk")
+                    .font(.headline)
+                Text("Liquid Glass tweaks are experimental. They were made as optimal and safe as possible, but errors can still happen — any damage or data loss that results is entirely your own responsibility. Back up your data before applying anything here.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(Theme.destructive.opacity(0.13),
+                    in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+    }
+
     // MARK: - Intro
 
     private var introCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("What this does")
-            Text("Writes the liquid-glass disable keys into .GlobalPreferences.plist and the SpringBoard preferences. A respring is required afterwards. Toggling a tweak off removes its key again.")
+            Text("Writes the liquid-glass tweak keys into .GlobalPreferences.plist and the SpringBoard preferences. A full reboot is required afterwards — a respring is not enough. Toggling a tweak off removes its key again.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -108,7 +140,11 @@ struct LiquidGlassApplyView: View {
 
     private var flowCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SectionHeader("Apply flow")
+            SectionHeader("Liquid Glass Backup & Apply")
+            Text("This Backup snapshots the liquid-glass preference files only. It is a separate backup task — not the MobileGestalt stock snapshot and not the User Data Backup (photos, videos, settings).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             statusRow
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 12) {
@@ -136,7 +172,7 @@ struct LiquidGlassApplyView: View {
                     }
                 }
             }
-            respringRow
+            rebootRow
         }
         .padding(16)
         .wsCard(cornerRadius: 18)
@@ -223,15 +259,28 @@ struct LiquidGlassApplyView: View {
         }
     }
 
-    private var respringRow: some View {
-        secondaryButton(
-            title: "Respring",
-            systemImage: "arrow.clockwise",
-            tint: Theme.wsBlue,
-            disabled: false,
-            action: { RespringHelper.shared.trigger() }
-        )
-        .accessibilityHint("Restart SpringBoard so the changes take effect")
+    /// Liquid Glass tweaks need a FULL REBOOT to take effect — a respring
+    /// is not enough. (Only PosterBoard tweaks apply with just a respring.)
+    /// This app cannot reboot the device for you: power it off and back on
+    /// (or force-restart it) after applying.
+    private var rebootRow: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "power")
+                .font(.title3)
+                .foregroundStyle(Theme.wsBlue)
+                .frame(width: 40, height: 40)
+                .background(Theme.wsBlue.opacity(0.14),
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Full reboot required")
+                    .font(.subheadline.weight(.semibold))
+                Text("These changes only take effect after a full device reboot. A respring is not enough.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
     }
 
     /// Full-width tinted outline button used for the secondary actions.

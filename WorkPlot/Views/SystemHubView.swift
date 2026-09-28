@@ -119,6 +119,15 @@ struct SystemHubView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                Divider().padding(.leading, 58)
+                NavigationLink { UserDataBackupView() } label: {
+                    toolRow(
+                        title: "User Data Backup",
+                        detail: "Back up photos, videos and settings (iOS 27)",
+                        symbol: "externaldrive.fill"
+                    )
+                }
+                .buttonStyle(.plain)
             }
             .padding(.vertical, 6)
             .padding(.horizontal, 16)
@@ -175,13 +184,12 @@ struct SystemHubView: View {
             SectionHeader("Upstream & exploit attributions")
             VStack(spacing: 0) {
                 let rows: [(String, String, String)] = [
-                    ("Gievano", "WorkPlot Developer", "https://github.com/gievano"),
-                    ("Ketamine by Nouvborne", "Original app — base framework", "https://github.com/Nouvborne/Ketamine"),
+                    ("adnan.120hz/gievano", "WorkPlot developer", "https://github.com/adnan120hz/WorkSlop"),
+                    ("GoldenNugget Developer", "Liquid Glass tweaks reference", "https://github.com/GoldenNugget-Team/GoldenNugget-mobile"),
                     ("forcequitOS", "bad_query", "https://github.com/forcequitOS"),
                     ("0xjohnnydev", "FilzaSlop / class-13 research", "https://github.com/0xjohnnydev"),
                     ("leminlimez", "Nugget & GestaltEdit", "https://github.com/leminlimez"),
                     ("rooootdev", "neospring (respring)", "https://github.com/rooootdev"),
-                    ("frs0n", "Placard", "https://github.com/frs0n"),
                 ]
                 ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
                     if row.0 == "rooootdev" {
@@ -282,8 +290,7 @@ struct SystemHubView: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader("Big thanks to")
             VStack(alignment: .leading, spacing: 0) {
-                thanksRow("Toto", "Supporter")
-                Text("…and everyone in the WorkSlop community who tested and reported issues.")
+                Text("Everyone in the WorkSlop community who tested and reported issues.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 8)
@@ -292,14 +299,5 @@ struct SystemHubView: View {
             .padding(.horizontal, 16)
             .wsCard(cornerRadius: 18)
         }
-    }
-
-    private func thanksRow(_ name: String, _ role: String) -> some View {
-        HStack {
-            Text(name).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
-            Text(role).font(.caption).foregroundStyle(.secondary)
-            Spacer()
-        }
-        .padding(.vertical, 7)
     }
 }

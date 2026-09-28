@@ -3,7 +3,7 @@ import SwiftUI
 
 // MARK: - Flow selection
 
-/// Which Disable-Liquid-Glass apply route WorkSlop uses, picked from the
+/// Which Liquid Glass tweaks apply route WorkSlop uses, picked from the
 /// running iOS version via `WorkSlopSupport.isIOS27()` / `isIOS26()`.
 enum LiquidGlassFlow {
     /// iOS 27: full backup → modify → full restore (GoldenNugget-style).
@@ -258,7 +258,7 @@ enum LiquidGlassFlowError: LocalizedError {
     }
 }
 
-/// Orchestrates the Disable-Liquid-Glass apply flow for the UI:
+/// Orchestrates the Liquid Glass tweaks apply flow for the UI:
 /// full backup → modify → full restore on iOS 27, partial-restore
 /// (bookrestore-style) on iOS 26. Any write or verification failure
 /// triggers the restore half of the flow, so the device is never left
@@ -270,7 +270,7 @@ import SwiftUI
 
 // MARK: - Apply model
 
-/// View model for the Disable Liquid Glass apply flow.
+/// View model for the Liquid Glass tweaks apply flow.
 @MainActor
 final class LiquidGlassApplyModel: ObservableObject {
     enum BusyTask { case backingUp, applying, restoring }
@@ -326,7 +326,7 @@ final class LiquidGlassApplyModel: ObservableObject {
             if changed == 0 {
                 statusMessage = "Nothing changed."
             } else {
-                statusMessage = "Applied to \(changed) files. Respring to take effect."
+                statusMessage = "Applied to \(changed) files. Reboot to take effect."
             }
         } catch {
             statusMessage = nil
@@ -453,7 +453,7 @@ final class LiquidGlassApplyModel: ObservableObject {
             switch flow {
             case .fullBackup:
                 try LiquidGlassBackupStore.restoreFullBackup()
-                statusMessage = "Full backup restored. Respring to take effect."
+                statusMessage = "Full backup restored. Reboot to take effect."
             case .partialRestore:
                 guard let session = lastSession else {
                     throw LiquidGlassFlowError.nothingToUndo
@@ -461,7 +461,7 @@ final class LiquidGlassApplyModel: ObservableObject {
                 try session.revert()
                 lastSession = nil
                 canUndoPartial = false
-                statusMessage = "Last apply reverted. Respring to take effect."
+                statusMessage = "Last apply reverted. Reboot to take effect."
             case .unsupported:
                 throw LiquidGlassFlowError.unsupportedFlow
             }

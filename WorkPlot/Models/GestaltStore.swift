@@ -15,6 +15,7 @@ enum ApplyError: LocalizedError {
     case writeVerificationFailed
     case restoreVerificationFailed
     case appleIntelligenceNotReady
+    case invalidSelection(String)
 
     var errorDescription: String? {
         switch self {
@@ -29,6 +30,7 @@ enum ApplyError: LocalizedError {
         case .writeVerificationFailed: return "The write did not verify. The original file was restored."
         case .restoreVerificationFailed: return "The restore did not verify. Please try again."
         case .appleIntelligenceNotReady: return "Apple Intelligence must be applied first (A62OafQ85EJAiiqKn4agtg must be 1)."
+        case .invalidSelection(let title): return "\(title): invalid selection, skipped."
         }
     }
 }
@@ -187,6 +189,89 @@ final class GestaltStore: ObservableObject {
         cacheExtra["oYicEKzVTz4/CxxE05pEgQ"] = hardwareModel
         cacheExtra["5pYKlGnYYBzGvAlIU8RjEQ"] = cpuModel
         return "Device wasn't natively eligible — spoofed to \(configuration.profile.marketingName) (\(configuration.profile.regulatoryModel))."
+    }
+
+    // MARK: - Intelligence tweaks (Tweaks tab)
+
+    /// Applies one of the three Intelligence tweaks to an in-memory
+    /// CacheExtra copy, ported from the old SiriAISetupView flow
+    /// (`applyAIRegion()` + `applySpoof()`). Every key is snapshotted
+    /// before its first write, exactly like that flow, so the changes stay
+    /// reversible through the same snapshot machinery. Returns an optional
+    /// warning for the caller to surface.
+    private func applyIntelligenceTweak(_ tweak: Tweak,
+                                        to cacheExtra: inout [String: Any]) throws -> String? {
+        switch tweak.id {
+        case IntelligenceTweaks.enableIntelligenceID:
+            return applyIntelligenceEnable(to: &cacheExtra)
+        case IntelligenceTweaks.usaRegionID:
+            applyUSARegion(to: &cacheExtra)
+            return nil
+        case IntelligenceTweaks.modelSpoofID:
+            let targets = IntelligenceTweaks.modelSpoofTargets
+            guard tweak.selectedIndex >= 0, tweak.selectedIndex < targets.count else {
+                throw ApplyError.invalidSelection(tweak.title)
+            }
+            applyModelFieldSpoof(targets[tweak.selectedIndex], to: &cacheExtra)
+            return nil
+        default:
+            return nil
+        }
+    }
+
+    /// "Enable Apple Intelligence": sets the US regulatory-region keys and,
+    /// when this device isn't natively eligible, changes the model field
+    /// key (ProductType) from the current iPhone to the target iPhone —
+    /// the `applyAIRegion()` port.
+    private func applyIntelligenceEnable(to cacheExtra: inout [String: Any]) -> String? {
+        let configuration = AIRegionConfiguration.resolve(for: cacheExtra)
+
+        for key in Self.siriKeys {
+            snapshotAIRegionKeyIfNeeded(key, in: cacheExtra)
+        }
+        let spoofWarning = applySpoof(configuration, to: &cacheExtra)
+
+        cacheExtra["A62OafQ85EJAiiqKn4agtg"] = 1
+        cacheExtra["h63QSdBCiT/z0WU6rdQv6Q"] = "LL"
+        cacheExtra["yK+xavymRGZ3xWc1tb8XDg"] = "LL/A"
+        cacheExtra["97JDvERpVwO+GHtthIh7hA"] = configuration.profile.regulatoryModel
+
+        if let spoofWarning {
+            return spoofWarning
+        }
+        return "This device is already Apple Intelligence eligible — the model field key was left as \(configuration.profile.marketingName)."
+    }
+
+    /// "Disable Region Lock": automatically switches the region-code keys
+    /// to USA (LL / LL-A).
+    private func applyUSARegion(to cacheExtra: inout [String: Any]) {
+        for key in ["h63QSdBCiT/z0WU6rdQv6Q", "yK+xavymRGZ3xWc1tb8XDg"] {
+            snapshotAIRegionKeyIfNeeded(key, in: cacheExtra)
+        }
+        cacheExtra["h63QSdBCiT/z0WU6rdQv6Q"] = "LL"
+        cacheExtra["yK+xavymRGZ3xWc1tb8XDg"] = "LL/A"
+    }
+
+    /// "Device Model Spoof": changes the model field key — the ProductType
+    /// key family plus the marketing name (when already cached) and the
+    /// regulatory model number — from the current iPhone to the target
+    /// iPhone. Deliberately NOT a full identity blast: board and CPU keys
+    /// are left alone.
+    private func applyModelFieldSpoof(_ target: SpoofTarget,
+                                     to cacheExtra: inout [String: Any]) {
+        let keys = DeviceSpoofingManager.productTypeKeys
+            + DeviceSpoofingManager.regulatoryModelKeys
+        for key in keys {
+            snapshotAIRegionKeyIfNeeded(key, in: cacheExtra)
+        }
+        for key in DeviceSpoofingManager.productTypeKeys {
+            cacheExtra[key] = target.productType
+        }
+        for key in DeviceSpoofingManager.deviceNameKeys where cacheExtra[key] != nil {
+            snapshotAIRegionKeyIfNeeded(key, in: cacheExtra)
+            cacheExtra[key] = target.marketingName
+        }
+        cacheExtra[DeviceSpoofingManager.regulatoryModelKeys[0]] = target.regulatoryModel
     }
 
     /// True when CacheExtra advertises a product type other than the real
@@ -352,7 +437,7 @@ final class GestaltStore: ObservableObject {
         var applied = 0
         var warnings: [String] = []
 
-        for tweak in tweaks where tweak.isEnabled && (ids == nil || ids!.contains(tweak.id)) && tweak.id != Tweak.deviceSpoofTweakID {
+        for tweak in tweaks where tweak.isEnabled && (ids == nil || ids!.contains(tweak.id)) && tweak.id != Tweak.deviceSpoofTweakID && !IntelligenceTweaks.handledIDs.contains(tweak.id) {
             do {
                 var mods = tweak.modifications
                 if let detail = tweak.detail {
@@ -425,6 +510,22 @@ final class GestaltStore: ObservableObject {
                 applied += 1
             } catch {
                 warnings.append("\(tweak.title): \(error.localizedDescription)")
+            }
+        }
+
+        // Intelligence tweaks (Tweaks tab): Enable Apple Intelligence, the
+        // US region switch, and the iPhone 16 → 17 Pro Max model-field
+        // spoof. They branch on the live device identity like the old
+        // SiriAISetupView flow did, so they run here — on the same in-memory
+        // CacheExtra — instead of the declarative loop above.
+        for tweak in tweaks where tweak.isEnabled && (ids == nil || ids!.contains(tweak.id)) && IntelligenceTweaks.handledIDs.contains(tweak.id) {
+            do {
+                if let warning = try applyIntelligenceTweak(tweak, to: &cacheExtra) {
+                    warnings.append(warning)
+                }
+                applied += 1
+            } catch {
+                warnings.append(error.localizedDescription)
             }
         }
 

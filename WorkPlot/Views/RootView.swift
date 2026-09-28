@@ -57,8 +57,10 @@ struct MainTabView: View {
                 .tabItem { Label("Tweaks", systemImage: "switch.2") }
             PosterBoardView()
                 .tabItem { Label("PosterBoard", systemImage: "square.stack.3d.up") }
-            SiriAISetupView()
-                .tabItem { Label("Siri AI Setup", systemImage: "brain.head.profile") }
+            NavigationStack {
+                LiquidGlassApplyView()
+            }
+            .tabItem { Label("Liquid Glass", systemImage: "drop.fill") }
             NavigationStack {
                 AirLiftPairingView()
             }
