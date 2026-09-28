@@ -285,39 +285,86 @@ final class LiquidGlassApplyModel: ObservableObject {
 
     private var lastSession: BookRestoreSession?
 
+    // MARK: - Full-backup engine state (iOS 27, GoldenNugget-style)
+
+    /// Which backup the last Backup run produced. Nil until Backup runs.
+    /// Internal (not private(set)): set from the LGFullBackup integration
+    /// extension (`LGApplyIntegration.swift`).
+    @Published var backupMode: LGBackupMode?
+    /// Live progress line for backup / apply / restore / media tasks.
+    /// Nil when idle. Shown verbatim in the UI.
+    @Published var taskProgress: String?
+    /// Device-channel readiness, refreshed by `refresh()`.
+    @Published var channelReady = false
+    @Published var channelNote: String?
+    @Published var airliftPaired = false
+    @Published var tunnelUp = false
+    /// AFC media store state.
+    @Published var mediaInfo: LGMediaStore.StoreInfo?
+    @Published var mediaBusy = false
+
     var flow: LiquidGlassFlow { LiquidGlassFlow.current }
 
     func refresh() {
         backupInfo = LiquidGlassBackupStore.info()
+        refreshChannel()
     }
 
-    private func begin(_ task: BusyTask) {
+    /// Internal (not private): the LGFullBackup integration extension
+    /// (`LGApplyIntegration.swift`) drives the same busy lifecycle.
+    func begin(_ task: BusyTask) {
         isBusy = true
         busyTask = task
     }
 
-    private func end() {
+    func end() {
         isBusy = false
         busyTask = nil
         refresh()
     }
 
+    /// Backup now runs through `LGBackupEngine`: a real device backup when
+    /// the AirLift device channel is usable, otherwise the honest
+    /// preference-snapshot fallback (`LiquidGlassBackupStore`). `backupMode`
+    /// records which one ran so the UI can label it truthfully.
     func createBackup() {
         guard !isBusy else { return }
         begin(.backingUp)
-        defer { end() }
-        do {
-            backupInfo = try LiquidGlassBackupStore.createFullBackup()
-            warnings = []
-            statusMessage = "Backup created. You can now press Apply."
-        } catch {
-            statusMessage = nil
-            warnings = [error.localizedDescription]
+        taskProgress = "Starting backup…"
+        Task {
+            defer {
+                taskProgress = nil
+                end()
+            }
+            do {
+                let result = try await LGBackupEngine.shared.runBackup { message in
+                    taskProgress = message
+                }
+                backupMode = result.mode
+                warnings = []
+                switch result.mode {
+                case .fullDevice:
+                    backupInfo = nil
+                    statusMessage = "Full device backup complete. You can now press Apply."
+                case .preferenceSnapshot:
+                    backupInfo = LiquidGlassBackupStore.info()
+                    statusMessage = "Preference snapshot created — not a full device backup. You can now press Apply."
+                }
+            } catch {
+                statusMessage = nil
+                warnings = [error.localizedDescription]
+            }
         }
     }
 
     func apply(tweaks: [Tweak]) {
         guard !isBusy else { return }
+        // Full-device backup → compile + inject + restore through the
+        // channel. Everything else keeps the existing write path below.
+        if flow == .fullBackup, backupMode == .fullDevice {
+            applyViaFullDevice(tweaks: tweaks)
+            return
+        }
         begin(.applying)
         defer { end() }
         do {
@@ -447,6 +494,12 @@ final class LiquidGlassApplyModel: ObservableObject {
 
     func restore() {
         guard !isBusy else { return }
+        // Full-device backup → restore the pristine liquid-glass files
+        // stashed at backup time through the channel.
+        if flow == .fullBackup, backupMode == .fullDevice {
+            restoreFullDevice()
+            return
+        }
         begin(.restoring)
         defer { end() }
         do {

@@ -46,6 +46,17 @@ Nugget and GestaltEdit ([leminlimez](https://github.com/leminlimez)) were
 consulted for MobileGestalt key semantics; Placard ([frs0n](https://github.com/frs0n/placard))
 as an app-design reference. No source code was copied from these projects.
 
+## GoldenNugget-mobile (GoldenNugget-Team) — AGPLv3
+
+The Liquid Glass full-backup engine (`WorkPlot/Features/Backup/LGFullBackup/`)
+adapts the *design* of [GoldenNugget-mobile](https://github.com/GoldenNugget-Team/GoldenNugget-mobile)
+by the GoldenNugget-Team (AGPLv3): a real protective mobilebackup2 backup pulled
+from the device, AFC media pull with verify-before-delete, a transient working
+backup wiped at the start of every run, manifest prune + tweak-row injection,
+and a manual restore step with no automatic restore at boot. **No
+GoldenNugget-mobile source code was copied** — the Swift implementation here is
+original. See GoldenNugget-mobile's LICENSE for the AGPLv3 terms.
+
 ## Pocket Poster (leminlimez) - GPLv3
 
 `WorkPlot/Wallpaper/` adapts PosterBoard wallpaper logic from
