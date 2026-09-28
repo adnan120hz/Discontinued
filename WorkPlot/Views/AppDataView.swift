@@ -413,8 +413,10 @@ public struct AppDataView: View {
                             .font(.subheadline.weight(isSelected ? .semibold : .regular))
                             .lineLimit(1)
                             .truncationMode(.middle)
-                        if let badge = typeBadge(for: entry) {
-                            badge
+                        if entry.isDirectory {
+                            EmptyView()
+                        } else {
+                            typeBadge(for: entry)
                         }
                     }
                     Text(entry.isDirectory ? "Folder" : AppDataManager.formatSize(entry.size))
