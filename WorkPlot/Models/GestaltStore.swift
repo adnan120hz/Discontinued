@@ -214,7 +214,11 @@ final class GestaltStore: ObservableObject {
     /// mirrors into so tweaks survive the NSGlobalDomain search chain; the
     /// SpringBoard candidates are `SpringBoardPlist.candidatePaths`
     /// (lowercase "springboard" — that is the real on-device filename).
-    private static func preferencePlistPaths(for domain: PlistDomain) -> [String] {
+    ///
+    /// Internal (not private) so the liquid-glass backup flow
+    /// (`LiquidGlassBackupFlow.swift`) can snapshot and restore the same
+    /// files through the same probe order.
+    static func preferencePlistPaths(for domain: PlistDomain) -> [String] {
         switch domain {
         case .globalPreferences:
             return [
@@ -241,10 +245,14 @@ final class GestaltStore: ObservableObject {
     /// `FileSystemAccessor.writePlist` createFile cannot survive the sandbox
     /// escape (EPERM without the lease), so the lease path is used instead.
     /// Returns the number of files actually changed.
+    ///
+    /// Internal (not private) so the liquid-glass backup flow
+    /// (`LiquidGlassBackupFlow.swift`) reuses this exact write path instead
+    /// of duplicating it.
     @discardableResult
-    private static func applyPlistModifications(_ mods: [PlistModification],
-                                               enabled: Bool,
-                                               warnings: inout [String]) -> Int {
+    static func applyPlistModifications(_ mods: [PlistModification],
+                                        enabled: Bool,
+                                        warnings: inout [String]) -> Int {
         var changed = 0
         let byDomain = Dictionary(grouping: mods, by: \.domain)
         for (domain, entries) in byDomain {

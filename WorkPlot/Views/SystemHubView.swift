@@ -110,6 +110,15 @@ struct SystemHubView: View {
                     )
                 }
                 .buttonStyle(.plain)
+                Divider().padding(.leading, 58)
+                NavigationLink { OnboardingView() } label: {
+                    toolRow(
+                        title: "Tutorial",
+                        detail: "Replay the first-launch walkthrough",
+                        symbol: "book"
+                    )
+                }
+                .buttonStyle(.plain)
             }
             .padding(.vertical, 6)
             .padding(.horizontal, 16)

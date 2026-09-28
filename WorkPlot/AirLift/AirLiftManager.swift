@@ -245,7 +245,9 @@ final class AirLiftManager: ObservableObject {
 
 // MARK: - VPNCheck
 
-/// Local dev-VPN detection used to gate the passcode-theme flow.
+/// Local dev-VPN detection used to gate the passcode-theme and wallet-image
+/// flows. It gates NOTHING else: these are the only two flows that write
+/// through a local developer VPN tunnel.
 ///
 /// Implemented with `getifaddrs`, looking for `utun*` interfaces — no extra
 /// entitlements or NetworkExtension required. Heuristic, not a guarantee:
@@ -256,7 +258,7 @@ enum VPNCheck {
         case noActiveVPN
 
         var errorDescription: String? {
-            "No local dev VPN detected. The passcode-theme flow writes " +
+            "No local dev VPN detected. This theme flow writes " +
             "through a local developer VPN tunnel (utun interface). " +
             "Connect your dev VPN profile, then try again."
         }
@@ -275,8 +277,8 @@ enum VPNCheck {
     }
 
     /// Throws `VPNError.noActiveVPN` with a user-facing explanation when no
-    /// local dev VPN is active. The passcode-theme flow MUST call this and
-    /// block when it throws.
+    /// local dev VPN is active. The passcode-theme and wallet-image flows
+    /// MUST call this (or check `isVPNActive()`) and block when it throws.
     static func requireVPN() throws {
         guard isVPNActive() else { throw VPNError.noActiveVPN }
     }

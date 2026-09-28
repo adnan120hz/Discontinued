@@ -88,7 +88,7 @@ struct AirLiftPairingView: View {
     @ObservedObject private var manager = AirLiftManager.shared
     @State private var showPicker = false
 
-    private var isIOS27: Bool { WorkSlopSupport.mobileGestaltAvailable() }
+    private var isIOS27: Bool { WorkSlopSupport.isIOS27() }
 
     var body: some View {
         ScrollView {
@@ -129,9 +129,14 @@ struct AirLiftPairingView: View {
     private var themesCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader("Themes & Tools")
-            themeRow(title: "Dialer Theme", detail: "Telephony UI assets (.zip)",
+            themeRow(title: "Dialer Theme", detail: "Telephony UI assets (.zip), iOS 26.6–26.7",
                      icon: "phone.fill", tint: .green) {
                 DialerThemeView()
+            }
+            Divider()
+            themeRow(title: "Dialer Theme (AirLift)", detail: "iOS 27.0 RC / beta / stable only",
+                     icon: "phone.badge.waveform.fill", tint: .blue) {
+                AirLiftDialerThemeView()
             }
             Divider()
             themeRow(title: "Passcode Theme", detail: "Lock-screen passcode UI",
@@ -210,11 +215,10 @@ struct AirLiftPairingView: View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader("Pairing Steps")
             VStack(alignment: .leading, spacing: 12) {
-                NumberedStep(number: 1, text: "Open Settings > Privacy & Security > Developer Mode.")
-                NumberedStep(number: 2, text: "Select WorkSlop in the device list.")
-                NumberedStep(number: 3, text: "Tap Allow.")
-                NumberedStep(number: 4, text: "Your pairing code appears below.")
-                NumberedStep(number: 5, text: "Tap Confirm Pairing to finish.")
+                NumberedStep(number: 1, text: "Tap Start Pairing below. WorkSlop generates a 6-digit pairing code.")
+                NumberedStep(number: 2, text: "Open Settings > Privacy & Security > Developer Mode > select WorkSlop > Pairing File.")
+                NumberedStep(number: 3, text: "Enter the pairing code shown in WorkSlop.")
+                NumberedStep(number: 4, text: "Tap Confirm Pairing in WorkSlop. Pairing completes automatically.")
             }
             if let code = manager.pairingCode {
                 Text(code)
@@ -251,9 +255,12 @@ struct AirLiftPairingView: View {
     private var fileFlowCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader("Pairing File Import")
-            Text("On iOS 26.6–26.7, generate a pairing file on your PC with iDevicePairing or iLoader, transfer it to this iPhone, then import it below.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 12) {
+                NumberedStep(number: 1, text: "On your PC or Mac, use iLoader or iDevicePairing to generate a pairing file for this iPhone.")
+                NumberedStep(number: 2, text: "Transfer the pairing file to this iPhone — for example with AirDrop, an email to yourself, or the Files app.")
+                NumberedStep(number: 3, text: "Tap Import Pairing File below and choose the transferred file.")
+                NumberedStep(number: 4, text: "Once imported, AirLift writes are unlocked on this iPhone. This import happens only on this screen.")
+            }
             if let file = manager.importedFile {
                 HStack {
                     Image(systemName: "doc.fill")

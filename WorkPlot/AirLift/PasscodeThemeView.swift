@@ -3,8 +3,8 @@ import UniformTypeIdentifiers
 
 // MARK: - PasscodeThemeView
 
-/// "Passcode Theme (AirLift)": pick a theme file and apply it via
-/// `AirLiftFileWriter`.
+/// "Passcode Theme (AirLift)": import a mandatory `.passthm` theme file and
+/// apply it via `AirLiftFileWriter`.
 ///
 /// Gated on BOTH conditions:
 /// 1. `AirLiftManager` is paired (code flow on iOS 27 / pairing file on iOS 26).
@@ -18,6 +18,11 @@ struct PasscodeThemeView: View {
     @State private var themeData: Data?
     @State private var status: String?
     @State private var isApplying = false
+
+    /// Custom document type for passcode theme files. `.passthm` is not a
+    /// system-registered extension, so `UTType(filenameExtension:)` returns a
+    /// dynamic exported type — good enough as the document picker filter.
+    private static let passthmType = UTType(filenameExtension: "passthm") ?? .data
 
     // MARK: Destination (NOT device-verified)
     //
@@ -59,7 +64,7 @@ struct PasscodeThemeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showPicker) {
             AirLiftDocumentPicker(
-                allowedTypes: [.image, .data],
+                allowedTypes: [Self.passthmType],
                 onPick: { url in
                     importTheme(from: url)
                     showPicker = false
@@ -131,10 +136,10 @@ struct PasscodeThemeView: View {
 
     private var pickerCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader("Theme File")
+            SectionHeader("Theme File", detail: ".passthm required")
             if let themeName {
                 HStack {
-                    Image(systemName: "photo.fill").foregroundStyle(Theme.accent)
+                    Image(systemName: "doc.fill").foregroundStyle(Theme.accent)
                     Text(themeName).font(.subheadline.weight(.medium))
                     Spacer(minLength: 0)
                     if let themeData {
@@ -145,11 +150,11 @@ struct PasscodeThemeView: View {
                     }
                 }
             } else {
-                Text("Pick the passcode theme file (image or theme bundle).")
+                Text("You must import a .passthm passcode theme file. Other file types are rejected.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            ActionButton(title: themeName == nil ? "Choose Theme File" : "Replace Theme File",
+            ActionButton(title: themeName == nil ? "Import .passthm File" : "Replace .passthm File",
                          systemImage: "square.and.arrow.down") {
                 showPicker = true
             }
@@ -179,7 +184,7 @@ struct PasscodeThemeView: View {
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("Info")
-            Text("The VPN gate is enforced with VPNCheck.requireVPN() (utun interface detection, no entitlements needed) and the flow blocks with an explanation when no local dev VPN is active. Destination path is not device-verified yet (see code comment).")
+            Text("The theme MUST be a .passthm file — other extensions are rejected with an explanation. The VPN gate is enforced with VPNCheck.requireVPN() (utun interface detection, no entitlements needed) and the flow blocks with an explanation when no local dev VPN is active. Destination path is not device-verified yet (see code comment).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -198,13 +203,24 @@ struct PasscodeThemeView: View {
     // MARK: Actions
 
     private func importTheme(from url: URL) {
+        // Mandatory extension check (case-insensitive): the passcode theme
+        // MUST be a .passthm file, whatever the picker filter allowed.
+        guard url.pathExtension.lowercased() == "passthm" else {
+            themeData = nil
+            themeName = nil
+            status = "Failed: \"\(url.lastPathComponent)\" is not a .passthm file. " +
+                     "Please import a passcode theme file ending in .passthm."
+            return
+        }
         let didAccess = url.startAccessingSecurityScopedResource()
         defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
         do {
             themeData = try Data(contentsOf: url)
             themeName = url.lastPathComponent
-            status = nil
+            status = "Imported \"\(url.lastPathComponent)\"."
         } catch {
+            themeData = nil
+            themeName = nil
             status = "Failed: \(error.localizedDescription)"
         }
     }

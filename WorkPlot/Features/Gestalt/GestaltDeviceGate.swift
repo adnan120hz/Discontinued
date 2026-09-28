@@ -1,7 +1,7 @@
 import Foundation
 
-/// Gate yang menentukan apakah sebuah tweak boleh tampil di perangkat ini.
-/// Diambil 1:1 dari WorkPlot agar `DeviceCapability.supports(_:)` tetap valid.
+/// Gate that decides whether a tweak may appear on this device.
+/// Taken 1:1 from WorkPlot so `DeviceCapability.supports(_:)` stays valid.
 enum GestaltDeviceGate: Hashable {
     case iphone13OrLater
     case iphone13OrBelow

@@ -7,7 +7,9 @@ import UniformTypeIdentifiers
 /// pick a custom image and apply it via `AirLiftFileWriter`.
 ///
 /// The Apply button stays disabled until a card is attached
-/// (`AirLiftManager.requiresAttachedCard`).
+/// (`AirLiftManager.requiresAttachedCard`) AND a local dev VPN is active
+/// (`VPNCheck.isVPNActive()`), matching the passcode-theme gate: the
+/// wallet-image flow writes through a local developer VPN tunnel.
 struct WalletThemeView: View {
     @ObservedObject private var manager = AirLiftManager.shared
     @State private var showCardPicker = false
@@ -32,14 +34,19 @@ struct WalletThemeView: View {
     static let walletImageStagingPath = "/var/mobile/Library/Caches/WorkSlopWalletTheme"
 
     private var canApply: Bool {
-        !manager.requiresAttachedCard && imageData != nil && !isApplying
+        !manager.requiresAttachedCard && imageData != nil && vpnActive && !isApplying
     }
+
+    /// Local dev-VPN state. Gated like the passcode-theme flow: the wallet
+    /// image is written through a local developer VPN tunnel (utun).
+    private var vpnActive: Bool { VPNCheck.isVPNActive() }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 SectionHeader("Wallet Image (AirLift)")
                 cardAttachCard
+                vpnGateCard
                 imagePickerCard
                 applyCard
                 if let status { statusLine(status) }
@@ -107,6 +114,41 @@ struct WalletThemeView: View {
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
+    // MARK: VPN gate
+
+    private var vpnGateCard: some View {
+        Group {
+            if vpnActive {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.shield.fill")
+                        .foregroundStyle(Theme.affirmative)
+                        .font(.title2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Dev VPN active").font(.headline)
+                        Text("A local dev VPN tunnel (utun) is up.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "network.slash")
+                            .foregroundStyle(Theme.caution)
+                            .font(.title2)
+                        Text("Local dev VPN required — blocked").font(.headline)
+                    }
+                    Text("No local dev VPN detected. The wallet-image flow writes through a local developer VPN tunnel (utun interface). Connect your dev VPN profile, then try again. Nothing will be written until then.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(18)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
     private var imagePickerCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader("Custom Image")
@@ -144,6 +186,10 @@ struct WalletThemeView: View {
                 Text("Attach a wallet card above to enable Apply.")
                     .font(.footnote)
                     .foregroundStyle(Theme.caution)
+            } else if !vpnActive {
+                Text("Connect a local dev VPN profile to enable Apply.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.caution)
             } else {
                 Text("Writes the custom image for \(manager.walletCard?.name ?? "the attached card") via AirLiftFileWriter.")
                     .font(.footnote)
@@ -164,7 +210,7 @@ struct WalletThemeView: View {
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("Info")
-            Text("Card attachment is persisted across launches (the .pkpass is copied into the app sandbox). The custom image is written through AirLiftFileWriter; the exact Wallet card-art path is not device-verified yet (see code comment).")
+            Text("Card attachment is persisted across launches (the .pkpass is copied into the app sandbox). The VPN gate is enforced with VPNCheck.requireVPN()-style utun detection (no entitlements needed) and the flow blocks with an explanation when no local dev VPN is active. The custom image is written through AirLiftFileWriter; the exact Wallet card-art path is not device-verified yet (see code comment).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -195,6 +241,12 @@ struct WalletThemeView: View {
     }
 
     private func apply() {
+        // Re-check the gate at apply time — the VPN can drop between
+        // rendering and tapping, same as the passcode-theme flow.
+        guard !manager.requiresAttachedCard, VPNCheck.isVPNActive() else {
+            status = "Failed: gate no longer open. Re-check the attached card and the dev VPN."
+            return
+        }
         guard canApply,
               let data = imageData,
               let name = imageName

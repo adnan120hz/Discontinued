@@ -4,6 +4,14 @@ struct RootView: View {
     @EnvironmentObject private var store: GestaltStore
     @ObservedObject private var respring = RespringHelper.shared
     @AppStorage("hasAcceptedDisclaimer") private var hasAcceptedDisclaimer = false
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @State private var showOnboarding = false
+
+    /// Onboarding only makes sense on a supported device.
+    private var supportsOnboarding: Bool {
+        if case .supported = DeviceCompatibility.currentStatus { return true }
+        return false
+    }
 
     var body: some View {
         Group {
@@ -21,6 +29,23 @@ struct RootView: View {
         }
         .fullScreenCover(isPresented: .constant(!hasAcceptedDisclaimer)) {
             DisclaimerView { hasAcceptedDisclaimer = true }
+        }
+        .fullScreenCover(isPresented: $showOnboarding) {
+            OnboardingView {
+                hasSeenOnboarding = true
+                showOnboarding = false
+            }
+        }
+        .onAppear {
+            if hasAcceptedDisclaimer && !hasSeenOnboarding && supportsOnboarding {
+                showOnboarding = true
+            }
+        }
+        .onChange(of: hasAcceptedDisclaimer) { _, newValue in
+            // The disclaimer cover dismisses first; present onboarding after.
+            if newValue && !hasSeenOnboarding && supportsOnboarding {
+                showOnboarding = true
+            }
         }
     }
 }

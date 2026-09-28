@@ -19,15 +19,21 @@ enum WorkSlopExploitPath {
 
 /// Central version gating for WorkSlop's exploit paths.
 ///
-/// Pragmatic rules, based on the *marketing* version
-/// (`ProcessInfo.processInfo.operatingSystemVersion`):
+/// Rules are based on the *marketing* version
+/// (`ProcessInfo.processInfo.operatingSystemVersion`), refined where needed
+/// by the build-code database (`WorkSlopBuilds`, keyed off
+/// `DeviceCompatibility.currentOS().build`).
 ///
-/// | iOS range      | MobileGestalt (bad_query) | AirLift (pairing) | PosterBoard + dialer |
-/// |---------------|---------------------------|-------------------|----------------------|
-/// | < 26.6        | no                        | no                | no                   |
-/// | 26.6 – 26.7.x | no                        | yes               | yes                  |
-/// | 27.x          | yes                       | yes               | no                   |
-/// | > 27          | no                        | no                | no                   |
+/// | iOS range                       | MobileGestalt (bad_query) | AirLift (pairing) | PosterBoard + dialer |
+/// |---------------------------------|---------------------------|-------------------|----------------------|
+/// | < 26.6                          | no                        | no                | no                   |
+/// | 26.6 – 26.7.x                   | no                        | yes               | yes                  |
+/// | 27.x db 1–4 / pb 1–2            | yes                       | yes               | no                   |
+/// | 27.x db 5+ / pb 3+ / RC / stable| no                        | yes (incl. dialer)| no                   |
+/// | > 27                            | no                        | no                | no                   |
+///
+/// Unknown or unparseable 27.x builds are treated as SUPPORTED (fail-open):
+/// no patched build inside the 27.x family has been confirmed.
 enum WorkSlopSupport {
 
     // MARK: Current version
@@ -37,22 +43,90 @@ enum WorkSlopSupport {
         ProcessInfo.processInfo.operatingSystemVersion
     }
 
+    /// True when running iOS 27.x. The backup-flow UI uses the full
+    /// backup/restore path here.
+    static func isIOS27() -> Bool {
+        currentVersion.majorVersion == 27
+    }
+
+    /// True when running iOS 26.x. The backup-flow UI uses the partial
+    /// (bookrestore) path here.
+    static func isIOS26() -> Bool {
+        currentVersion.majorVersion == 26
+    }
+
     /// True when (major, minor, patch) >= the given triple.
     private static func isAtLeast(_ v: OperatingSystemVersion,
                                  major: Int, minor: Int, patch: Int = 0) -> Bool {
         (v.majorVersion, v.minorVersion, v.patchVersion) >= (major, minor, patch)
     }
 
+    // MARK: Build channel
+
+    /// Channels the running build is known under. Developer-beta and
+    /// public-beta builds sometimes share a build string (e.g. 24A5390f is
+    /// both dev beta 4 and public beta 2), so this returns all known channels.
+    ///
+    /// Returns `nil` when the build string is missing or unparseable, and an
+    /// empty array when the build is well-formed but not listed in
+    /// ``WorkSlopBuilds``. Both cases are fail-open in the predicates below.
+    private static func buildChannels() -> [WorkSlopBuildChannel]? {
+        guard let raw = DeviceCompatibility.currentOS().build,
+              DeviceCompatibility.Build.parse(raw) != nil
+        else { return nil }
+        return WorkSlopBuilds.channels(forBuild: raw)
+    }
+
+    /// The primary build channel of the running system.
+    ///
+    /// Returns `.unknown` when the build string is well-formed but not listed
+    /// in the database, and `nil` when the build string is missing or
+    /// unparseable. (Do not edit: owned by the version-gating worker.)
+    static func currentBuildChannel() -> WorkSlopBuildChannel? {
+        guard let channels = buildChannels() else { return nil }
+        return channels.first ?? .unknown
+    }
+
     // MARK: Path availability
 
-    /// iOS 27.0+ (dev beta 1–5, public beta 1–3, RC, stable) via bad_query.
+    /// iOS 27.x dev beta 1–4 and public beta 1–2 via bad_query.
     ///
-    /// Build-string refinement is best-effort only: `DeviceCompatibility.Build`
-    /// parsing is consulted for context (see ``betaOrSeedBuild()``), but an
-    /// unknown or unparseable 27.0 build is treated as SUPPORTED (fail-open),
-    /// because no patched build inside the 27.0 family has been confirmed.
+    /// Resolved through the build-code database
+    /// (`DeviceCompatibility.currentOS().build`). Unknown or unparseable
+    /// 27.x builds are treated as SUPPORTED (fail-open), because no patched
+    /// build inside the 27.x family has been confirmed.
     static func mobileGestaltAvailable() -> Bool {
-        currentVersion.majorVersion == 27
+        guard isIOS27() else { return false }
+        guard let channels = buildChannels() else { return true }
+        if channels.isEmpty { return true }
+        return channels.contains { channel in
+            switch channel {
+            case .devBeta(let n): return (1...4).contains(n)
+            case .publicBeta(let n): return (1...2).contains(n)
+            case .rc, .stable, .unknown: return false
+            }
+        }
+    }
+
+    /// iOS 27.x RC, dev beta 5+, public beta 2+, or official stable: dialer
+    /// theming is available through the AirLift pairing path.
+    ///
+    /// Earlier 27.x builds (dev beta 1–4, public beta 1) route dialer theming
+    /// through bad_query instead (see ``mobileGestaltAvailable()``).
+    /// Unknown or unparseable 27.x builds are treated as SUPPORTED
+    /// (fail-open). (Do not edit: owned by the version-gating worker.)
+    static func airLiftDialerAvailable() -> Bool {
+        guard isIOS27() else { return false }
+        guard let channels = buildChannels() else { return true }
+        if channels.isEmpty { return true }
+        return channels.contains { channel in
+            switch channel {
+            case .devBeta(let n): return n >= 5
+            case .publicBeta(let n): return n >= 2
+            case .rc, .stable: return true
+            case .unknown: return false
+            }
+        }
     }
 
     /// iOS 26.6 through 26.7.x: PosterBoard + dialer theming via bad_query.

@@ -254,6 +254,15 @@ struct DialerThemeView: View {
     // MARK: Actions
 
     private func importZip(from url: URL) {
+        // Extension check first (case-insensitive): the document picker filters
+        // for .zip, but a renamed non-zip file must fail with a clear message.
+        guard url.pathExtension.lowercased() == "zip" else {
+            entries = []
+            zipName = nil
+            status = "Failed: \"\(url.lastPathComponent)\" is not a .zip file. " +
+                     "Please choose a file ending in .zip."
+            return
+        }
         let didAccess = url.startAccessingSecurityScopedResource()
         defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
         do {
@@ -277,6 +286,268 @@ struct DialerThemeView: View {
             var failures: [String] = []
             for entry in files {
                 let dest = (Self.phoneDataContainerPath as NSString)
+                    .appendingPathComponent(entry.name)
+                do {
+                    try AirLiftFileWriter.writeFile(data: entry.data, to: dest)
+                } catch {
+                    failures.append("\(entry.name): \(error.localizedDescription)")
+                }
+            }
+            let message: String
+            if failures.isEmpty {
+                message = "Applied \(files.count) files. Respring to take effect."
+            } else {
+                message = "Failed: \(failures.count) of \(files.count) writes failed. First: \(failures[0])"
+            }
+            DispatchQueue.main.async {
+                status = message
+                isApplying = false
+            }
+        }
+    }
+}
+
+
+// MARK: - AirLift Dialer Theme (iOS 27, pairing path)
+
+/// Local availability gate for the AirLift dialer-theme flow.
+///
+/// Availability for the AirLift dialer theme is resolved by
+/// `WorkSlopSupport.airLiftDialerAvailable()` (build-code DB in
+/// `WorkSlopBuilds.swift`): iOS 27.0 RC, dev beta 5+, public beta 2+, or
+/// official stable. Unknown builds fail open per the shared predicate.
+private var airLiftDialerAvailable: Bool { WorkSlopSupport.airLiftDialerAvailable() }
+
+/// "Dialer Theme (AirLift)": the AirLift pairing-path counterpart of
+/// `DialerThemeView`. Separate view — the iOS 26.6–26.7 bad_query dialer view
+/// above stays as-is.
+///
+/// Visibility is version-gated: on devices that are NOT iOS 27.0 RC / dev
+/// beta 5+ / public beta 2+ / official stable, the view shows a clear
+/// "not available on this iOS version" state instead of the import flow.
+/// When available, AirLift pairing is required before anything applies.
+struct AirLiftDialerThemeView: View {
+    @ObservedObject private var manager = AirLiftManager.shared
+    @State private var showPicker = false
+    @State private var zipName: String?
+    @State private var entries: [ZipEntry] = []
+    @State private var status: String?
+    @State private var isApplying = false
+
+    /// Staging path for the AirLift dialer-theme assets.
+    ///
+    /// NOT device-verified: the Phone app's on-disk telephony-asset location
+    /// on iOS 27.x still needs on-device confirmation. Files are staged here
+    /// so the flow (version gate → pairing → import → write) is reviewable
+    /// end-to-end; narrow this path once the real location is confirmed on a
+    /// test device.
+    static let airLiftDialerStagingPath = "/var/mobile/Library/Caches/WorkSlopAirLiftDialerTheme"
+
+    private var isAvailableVersion: Bool { airLiftDialerAvailable }
+    private var files: [ZipEntry] { entries.filter { !$0.isDirectory } }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                SectionHeader("Dialer Theme (AirLift)")
+                if !isAvailableVersion {
+                    notAvailableCard
+                } else if !manager.isPaired {
+                    pairingRequiredCard
+                } else {
+                    importCard
+                    if !entries.isEmpty {
+                        fileListCard
+                        applyCard
+                    }
+                }
+                if let status { statusLine(status) }
+                infoCard
+            }
+            .padding(Theme.pagePadding)
+        }
+        .background(Color(uiColor: .systemGroupedBackground))
+        .navigationTitle("Dialer Theme (AirLift)")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showPicker) {
+            AirLiftDocumentPicker(
+                allowedTypes: [UTType(filenameExtension: "zip") ?? .data],
+                onPick: { url in
+                    importZip(from: url)
+                    showPicker = false
+                },
+                onCancel: { showPicker = false }
+            )
+        }
+    }
+
+    // MARK: Cards
+
+    private var notAvailableCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "phone.badge.plus")
+                    .foregroundStyle(Theme.caution)
+                    .font(.title2)
+                Text("Not available on this iOS version").font(.headline)
+            }
+            Text("Dialer theming via AirLift requires iOS 27.0 RC, dev beta 5+, public beta 2+, or the official stable release. This device is \(WorkSlopSupport.deviceLabel()). Nothing can be imported or applied here.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var pairingRequiredCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: "link.badge.plus")
+                    .foregroundStyle(Theme.caution)
+                    .font(.title2)
+                Text("Pairing required").font(.headline)
+            }
+            Text("AirLift is not paired. Go to AirLift Pairing first — confirm the pairing code (iOS 27) or import your pairing file (iOS 26.6–26.7) — then come back.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var importCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader("Theme ZIP")
+            if let zipName {
+                HStack {
+                    Image(systemName: "archivebox.fill").foregroundStyle(Theme.accent)
+                    Text(zipName).font(.subheadline.weight(.medium))
+                    Spacer(minLength: 0)
+                    Text("\(files.count) files").font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                Text("Import a .zip containing the dialer theme assets. Extraction is done on-device with ZIPFoundation.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            ActionButton(title: zipName == nil ? "Import Dialer ZIP" : "Replace ZIP",
+                         systemImage: "square.and.arrow.down") {
+                showPicker = true
+            }
+        }
+        .padding(18)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var fileListCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeader("Files", detail: "\(files.count)")
+            ForEach(files.prefix(50)) { entry in
+                HStack {
+                    Image(systemName: "doc")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                    Text(entry.name)
+                        .font(.caption)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text(ByteCountFormatter.string(fromByteCount: Int64(entry.size),
+                                                   countStyle: .file))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 2)
+            }
+            if files.count > 50 {
+                Text("…and \(files.count - 50) more")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(18)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var applyCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader("Apply")
+            Text("Writes every file through AirLift to \(Self.airLiftDialerStagingPath), preserving the zip's folder structure.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            ActionButton(title: "Apply Dialer Theme",
+                         systemImage: "phone.fill",
+                         isBusy: isApplying,
+                         disabled: files.isEmpty || !manager.isPaired) {
+                apply()
+            }
+            if status?.hasPrefix("Applied") == true {
+                Button("Respring to take effect") {
+                    RespringHelper.shared.trigger()
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding(18)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var infoCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeader("Info")
+            Text("This is the AirLift pairing-path dialer theme for iOS 27.0 (RC / dev beta 5+ / public beta 2+ / stable). The separate iOS 26.6–26.7 bad_query dialer view is unchanged. ZIPFoundation extracts with CRC32 verification; zip-slip paths are rejected. Destination path is not device-verified yet (see code comment).")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func statusLine(_ message: String) -> some View {
+        Text(message)
+            .font(.footnote)
+            .foregroundStyle(message.hasPrefix("Failed") ? Theme.caution : .secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: Actions
+
+    private func importZip(from url: URL) {
+        guard url.pathExtension.lowercased() == "zip" else {
+            entries = []
+            zipName = nil
+            status = "Failed: \"\(url.lastPathComponent)\" is not a .zip file. " +
+                     "Please choose a file ending in .zip."
+            return
+        }
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let data = try Data(contentsOf: url)
+            entries = try ZipExtractor.extract(data)
+            zipName = url.lastPathComponent
+            status = "Extracted \(files.count) files from \(url.lastPathComponent)."
+        } catch {
+            entries = []
+            zipName = nil
+            status = "Failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func apply() {
+        guard manager.isPaired, !files.isEmpty else { return }
+        isApplying = true
+        status = nil
+        // Off the main thread; AirLiftFileWriter is synchronous file I/O.
+        DispatchQueue.global(qos: .userInitiated).async {
+            var failures: [String] = []
+            for entry in files {
+                let dest = (Self.airLiftDialerStagingPath as NSString)
                     .appendingPathComponent(entry.name)
                 do {
                     try AirLiftFileWriter.writeFile(data: entry.data, to: dest)
