@@ -1,16 +1,19 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// App Data reader: browse app-data containers on the device, move files
-/// between folders, and import files — all through the bad_query sandbox
-/// escape (`AppDataManager`).
+/// Filza-style app-data browser: browse app containers on the device and
+/// view, modify, move, add, import, and export files — all through the
+/// bad_query sandbox escape (`AppDataManager`).
+///
+/// Nothing is listed until the user taps **Run Access**, which performs a
+/// real bad_query lease probe; a failed probe reports an error instead of
+/// showing an empty list.
 ///
 /// Supported on iOS 18.x, 26.0 / 26.6.1, and 27.0 dev beta 1–4 /
 /// public beta 1–2. On other builds the view explains why it is unavailable
 /// instead of pretending to work.
 ///
-/// The coordinator wires this view into the menu; it is intentionally not
-/// referenced from `HomeView` here.
+/// This is a standalone view; the coordinator embeds it into the menu.
 public struct AppDataView: View {
     @StateObject private var manager = AppDataManager()
     @State private var searchText = ""
@@ -18,6 +21,14 @@ public struct AppDataView: View {
     @State private var moveEntry: AppDataEntry?
     @State private var moveNewName = ""
     @State private var showingImporter = false
+    @State private var showingAddMenu = false
+    @State private var showingNewFolder = false
+    @State private var newFolderName = ""
+    @State private var viewingEntry: AppDataEntry?
+    @State private var editingEntry: AppDataEntry?
+    @State private var editorText = ""
+    @State private var shareURL: URL?
+    @State private var isSharing = false
 
     public init() {}
 
@@ -31,7 +42,7 @@ public struct AppDataView: View {
 
     private var importTypes: [UTType] {
         var types: [UTType] = [.zip, .png, .jpeg]
-        for ext in ["passthm", "raw"] {
+        for ext in ["passthm", "img", "raw", "plist"] {
             if let t = UTType(filenameExtension: ext) { types.append(t) }
         }
         return types
@@ -43,6 +54,8 @@ public struct AppDataView: View {
 
             if let reason = manager.unavailableReason {
                 unavailableCard(reason: reason)
+            } else if !manager.accessGranted {
+                runAccessCard
             } else if manager.activeContainer == nil {
                 containerList
             } else {
@@ -54,11 +67,6 @@ public struct AppDataView: View {
         }
         .padding(Theme.pagePadding)
         .background(Theme.page)
-        .onAppear {
-            if manager.containers.isEmpty && manager.isAvailable {
-                manager.loadContainers()
-            }
-        }
         .fileImporter(isPresented: $showingImporter,
                       allowedContentTypes: importTypes,
                       allowsMultipleSelection: false) { result in
@@ -69,6 +77,76 @@ public struct AppDataView: View {
                 manager.errorMessage = "Could not pick a file: \(error.localizedDescription)"
             }
         }
+        .confirmationDialog("Add", isPresented: $showingAddMenu, titleVisibility: .visible) {
+            Button("New Folder") {
+                newFolderName = ""
+                showingNewFolder = true
+            }
+            Button("Import File") {
+                selectedEntry = nil
+                showingImporter = true
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .sheet(item: $viewingEntry) { entry in
+            AppDataFileViewer(entry: entry, manager: manager)
+        }
+        .sheet(item: $editingEntry) { entry in
+            NavigationStack {
+                TextEditor(text: $editorText)
+                    .font(.system(.body, design: .monospaced))
+                    .padding()
+                    .navigationTitle(entry.name)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { editingEntry = nil }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Save") {
+                                manager.writeTextFile(editorText, to: entry)
+                                editingEntry = nil
+                                selectedEntry = nil
+                            }
+                            .disabled(manager.busy)
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $showingNewFolder) {
+            NavigationStack {
+                VStack(alignment: .leading, spacing: 12) {
+                    TextField("Folder name", text: $newFolderName)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .wsCard(cornerRadius: 12)
+                    Spacer()
+                }
+                .padding()
+                .navigationTitle("New Folder")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { showingNewFolder = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Create") {
+                            manager.createFolder(named: newFolderName)
+                            showingNewFolder = false
+                        }
+                        .disabled(manager.busy || newFolderName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $isSharing) {
+            if let url = shareURL {
+                ActivityShareSheet(items: [url])
+            }
+        }
     }
 
     // MARK: - Header
@@ -77,7 +155,7 @@ public struct AppDataView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("App Data")
                 .font(.title2.weight(.semibold))
-            Text("Browse app-data containers, move files, and import files via bad_query.")
+            Text("Filza-style browser for app-data containers, via the bad_query sandbox escape.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -102,6 +180,52 @@ public struct AppDataView: View {
         }
         .padding(18)
         .wsCard()
+    }
+
+    // MARK: - Run Access gate
+
+    private var runAccessCard: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 24)
+            VStack(spacing: 14) {
+                Image(systemName: "folder.badge.gearshape")
+                    .font(.system(size: 54))
+                    .foregroundStyle(Theme.wsBlue)
+                Text("App Data Access")
+                    .font(.title3.weight(.semibold))
+                Text("Tap Run Access to open a bad_query sandbox lease and scan app-data containers on this device. Nothing is listed until access is granted.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if manager.busy {
+                    ProgressView("Requesting access…")
+                        .padding(.top, 4)
+                } else {
+                    Button("Run Access") { manager.requestAccess() }
+                        .wsAction(prominent: true)
+                        .padding(.top, 4)
+                }
+
+                if let error = manager.errorMessage {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.destructive)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Text("Supported: iOS 18.x, 26.0 / 26.6.1, 27.0 dev beta 1–4 / public beta 1–2.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 2)
+            }
+            .frame(maxWidth: 420)
+            .frame(maxWidth: .infinity)
+            Spacer(minLength: 24)
+        }
     }
 
     // MARK: - Container list
@@ -185,14 +309,14 @@ public struct AppDataView: View {
 
     private var browser: some View {
         VStack(alignment: .leading, spacing: 12) {
-            breadcrumbBar
+            toolbar
             entriesList
             actionArea
             statusLine
         }
     }
 
-    private var breadcrumbBar: some View {
+    private var toolbar: some View {
         HStack(spacing: 8) {
             Button {
                 selectedEntry = nil
@@ -231,10 +355,7 @@ public struct AppDataView: View {
             .wsCard(cornerRadius: 12)
             .disabled(manager.busy)
 
-            Button {
-                selectedEntry = nil
-                showingImporter = true
-            } label: {
+            Button { showingAddMenu = true } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "plus")
                     Text("Add")
@@ -283,14 +404,19 @@ public struct AppDataView: View {
             }
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: entry.isDirectory ? "folder.fill" : fileIcon(for: entry.name))
+                Image(systemName: entry.isDirectory ? "folder.fill" : fileIcon(for: entry))
                     .foregroundStyle(entry.isDirectory ? Theme.wsBlue : .secondary)
                     .frame(width: 28)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(entry.name)
-                        .font(.subheadline.weight(isSelected ? .semibold : .regular))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(entry.name)
+                            .font(.subheadline.weight(isSelected ? .semibold : .regular))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        if let badge = typeBadge(for: entry) {
+                            badge
+                        }
+                    }
                     Text(entry.isDirectory ? "Folder" : AppDataManager.formatSize(entry.size))
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -318,12 +444,58 @@ public struct AppDataView: View {
         }
     }
 
-    private func fileIcon(for name: String) -> String {
-        switch (name as NSString).pathExtension.lowercased() {
-        case "zip": "archivebox.fill"
-        case "png", "jpg", "jpeg": "photo.fill"
-        case "passthm": "key.fill"
-        default: "doc.fill"
+    // MARK: - File type icons & badges
+
+    private func fileIcon(for entry: AppDataEntry) -> String {
+        switch entry.fileExtension {
+        case "zip": return "archivebox.fill"
+        case "png", "jpg", "jpeg", "img": return "photo.fill"
+        case "raw": return "camera.fill"
+        case "plist": return "list.bullet.rectangle.fill"
+        case "passthm": return "key.fill"
+        default: return "doc.fill"
+        }
+    }
+
+    @ViewBuilder
+    private func typeBadge(for entry: AppDataEntry) -> some View {
+        if entry.isDirectory {
+            EmptyView()
+        } else if let label = badgeLabel(for: entry.fileExtension) {
+            Text(label)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(badgeColor(for: entry.fileExtension))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(badgeColor(for: entry.fileExtension).opacity(0.12),
+                            in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        } else {
+            EmptyView()
+        }
+    }
+
+    private func badgeLabel(for ext: String) -> String? {
+        switch ext {
+        case "zip": return "ZIP"
+        case "passthm": return "PSTHM"
+        case "png": return "PNG"
+        case "jpg", "jpeg": return "JPEG"
+        case "img": return "IMG"
+        case "raw": return "RAW"
+        case "plist": return "PLIST"
+        default: return nil
+        }
+    }
+
+    private func badgeColor(for ext: String) -> Color {
+        switch ext {
+        case "zip": return .orange
+        case "passthm": return .purple
+        case "png", "jpg", "jpeg": return .green
+        case "img": return .teal
+        case "raw": return .pink
+        case "plist": return Theme.wsBlue
+        default: return .secondary
         }
     }
 
@@ -350,11 +522,42 @@ public struct AppDataView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            HStack(spacing: 10) {
-                Button("Move…") {
+            HStack(spacing: 8) {
+                Button { viewingEntry = entry } label: {
+                    Label("View", systemImage: "eye")
+                }
+                .wsAction()
+                .disabled(manager.busy)
+
+                Button {
+                    if let text = manager.readTextFile(entry) {
+                        editorText = text
+                        editingEntry = entry
+                    }
+                } label: {
+                    Label("Modify", systemImage: "pencil")
+                }
+                .wsAction()
+                .disabled(manager.busy)
+
+                Button {
+                    if let url = manager.exportFile(entry) {
+                        shareURL = url
+                        isSharing = true
+                    }
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                }
+                .wsAction()
+                .disabled(manager.busy)
+            }
+            HStack(spacing: 8) {
+                Button {
                     moveEntry = entry
                     moveNewName = entry.name
                     selectedEntry = nil
+                } label: {
+                    Label("Move…", systemImage: "folder.badge.plus")
                 }
                 .wsAction(prominent: true)
                 .disabled(manager.busy)
@@ -417,8 +620,84 @@ public struct AppDataView: View {
     }
 
     private var limitsFootnote: some View {
-        Text("Reads, moves, and imports go through the bad_query sandbox escape. Some protected locations may refuse access even with an active lease. Supported import types: zip, passthm, png, jpeg, raw.")
+        Text("Reads, moves, and imports go through the bad_query sandbox escape. Only zip, passthm, png, jpeg, img, raw, and plist files can be imported. Text editing works on UTF-8 text files only — binary files cannot be edited in-app. Some protected locations may refuse access even with an active lease.")
             .font(.caption)
             .foregroundStyle(.secondary)
+    }
+}
+
+// MARK: - File viewer
+
+/// Shows a text preview (UTF-8 files), an image preview (image files), or
+/// an honest note when the format cannot be previewed.
+private struct AppDataFileViewer: View {
+    let entry: AppDataEntry
+    let manager: AppDataManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var text: String?
+    @State private var image: UIImage?
+    @State private var loaded = false
+
+    private var isImage: Bool {
+        ["png", "jpg", "jpeg", "img"].contains(entry.fileExtension)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if !loaded {
+                    ProgressView("Reading file…")
+                } else if let image {
+                    ScrollView([.horizontal, .vertical]) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .padding()
+                    }
+                } else if let text {
+                    ScrollView {
+                        Text(text)
+                            .font(.system(.body, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                    }
+                } else {
+                    VStack(spacing: 12) {
+                        Image(systemName: "doc.fill")
+                            .font(.system(size: 44))
+                            .foregroundStyle(.secondary)
+                        Text("Preview is not available for this format.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text("Use Export to copy the file out and inspect it elsewhere.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .navigationTitle(entry.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+        .onAppear(perform: load)
+    }
+
+    private func load() {
+        guard !loaded else { return }
+        if isImage {
+            if let data = manager.readFileData(entry) {
+                image = UIImage(data: data)
+            }
+        } else {
+            // readTextFile reports a clear message for binary files.
+            text = manager.readTextFile(entry)
+        }
+        loaded = true
     }
 }
