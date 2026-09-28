@@ -58,6 +58,22 @@ jobs:
           name: xcodebuild-log
           path: ${{ runner.temp }}/xcodebuild.log
 
+      - name: Extract error to artifact name (on failure)
+        if: failure()
+        id: extract
+        run: |
+          ERR=$(grep -m1 -i "error:" "$RUNNER_TEMP/xcodebuild.log" | sed 's/[^a-zA-Z0-9_.-]/_/g' | cut -c1-120)
+          if [ -z "$ERR" ]; then ERR="no_error_line_found"; fi
+          echo "errname=ERR_${ERR}" >> "$GITHUB_OUTPUT"
+          echo "First error: $ERR"
+
+      - name: Upload error marker (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.extract.outputs.errname }}
+          path: ${{ runner.temp }}/xcodebuild.log
+
       - name: Package unsigned IPA
         run: |
           mkdir -p "$RUNNER_TEMP/Payload"
