@@ -378,7 +378,7 @@ enum LiquidGlassTweaks {
             category: .liquidGlass,
             symbol: "doc.plaintext",
             isRisky: true,
-            notes: "Debug/tuning key \u2014 behavior is unverified on-device.",
+            notes: "Debug/tuning key \u{2014} behavior is unverified on-device.",
             plistModifications: [
                 PlistModification(domain: .globalPreferences,
                                   key: "com.apple.SwiftUI.GlassContainerLogging",
@@ -666,7 +666,7 @@ enum LiquidGlassTweaks {
             category: .liquidGlass,
             symbol: "ladybug.fill",
             isRisky: true,
-            notes: "Debug/tuning key \u2014 behavior is unverified on-device.",
+            notes: "Debug/tuning key \u{2014} behavior is unverified on-device.",
             plistModifications: [
                 PlistModification(domain: .globalPreferences,
                                   key: "GlassVisualDebug",
@@ -682,7 +682,7 @@ enum LiquidGlassTweaks {
             category: .liquidGlass,
             symbol: "ladybug.fill",
             isRisky: true,
-            notes: "Debug/tuning key \u2014 behavior is unverified on-device.",
+            notes: "Debug/tuning key \u{2014} behavior is unverified on-device.",
             plistModifications: [
                 PlistModification(domain: .globalPreferences,
                                   key: "GlassVisualWarnings",
@@ -698,7 +698,7 @@ enum LiquidGlassTweaks {
             category: .liquidGlass,
             symbol: "circle.dashed",
             isRisky: true,
-            notes: "Debug/tuning key \u2014 behavior is unverified on-device.",
+            notes: "Debug/tuning key \u{2014} behavior is unverified on-device.",
             plistModifications: [
                 PlistModification(domain: .globalPreferences,
                                   key: "blurFillExperiment",
@@ -938,7 +938,7 @@ enum LiquidGlassTweaks {
             category: .liquidGlass,
             symbol: "square.on.square",
             isRisky: true,
-            notes: "Debug/tuning key \u2014 behavior is unverified on-device.",
+            notes: "Debug/tuning key \u{2014} behavior is unverified on-device.",
             plistModifications: [
                 PlistModification(domain: .globalPreferences,
                                   key: "UISolariumFloatingContentViewDebugBackgroundFills",
