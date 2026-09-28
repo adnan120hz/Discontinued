@@ -135,6 +135,36 @@ enum WorkSlopSupport {
         return isAtLeast(v, major: 26, minor: 6) && v.majorVersion < 27
     }
 
+    /// App Data reader via bad_query.
+    ///
+    /// Supported on iOS 18.x (any build), iOS 26.0 and 26.6.1, and
+    /// iOS 27.0 dev beta 1–4 / public beta 1–2 (the same build-channel
+    /// window as ``mobileGestaltAvailable()``).
+    ///
+    /// iOS 26 is gated by marketing version; iOS 18 by major version;
+    /// iOS 27 by build channel from the build-code database. Unknown or
+    /// unparseable 27.x builds are treated as SUPPORTED (fail-open),
+    /// matching the other predicates — no patched 27.x build inside this
+    /// window has been confirmed. Everything else is unsupported.
+    static func appDataAvailable() -> Bool {
+        let v = currentVersion
+        if v.majorVersion == 18 { return true }
+        if v.majorVersion == 26 {
+            return (v.minorVersion == 0 && v.patchVersion == 0)
+                || (v.minorVersion == 6 && v.patchVersion == 1)
+        }
+        guard isIOS27() else { return false }
+        guard let channels = buildChannels() else { return true }
+        if channels.isEmpty { return true }
+        return channels.contains { channel in
+            switch channel {
+            case .devBeta(let n): return (1...4).contains(n)
+            case .publicBeta(let n): return (1...2).contains(n)
+            case .rc, .stable, .unknown: return false
+            }
+        }
+    }
+
     /// iOS 26.6 through 27.x: pairing-based file writes.
     ///
     /// The pairing handshake is version-tolerant across the whole bad_query

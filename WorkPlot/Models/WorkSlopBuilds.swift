@@ -30,6 +30,29 @@ enum WorkSlopBuilds {
 
     /// Lowercased build string → (marketing version, channels).
     static let database: [String: (version: String, channels: [WorkSlopBuildChannel])] = [
+        // MARK: iOS 18.x family
+        // best-effort: widely reported stable builds. The App Data reader
+        // gates iOS 18 by version (any 18.x); these entries only resolve
+        // version labels and build channels for display.
+        "22a3374": ("18.0", [.stable]),
+        "22b83": ("18.1", [.stable]),
+        "22c152": ("18.2", [.stable]),
+        "22d75": ("18.3", [.stable]),
+        "22e240": ("18.4", [.stable]),
+        "22f76": ("18.5", [.stable]),
+        "22g86": ("18.6", [.stable]),
+        "22g90": ("18.6.1", [.stable]),
+        "22g100": ("18.6.2", [.stable]),
+        "22h20": ("18.7", [.stable]),
+        "22h31": ("18.7.1", [.stable]),
+        "22h124": ("18.7.2", [.stable]),
+
+        // MARK: iOS 26.0
+        // best-effort: initial iOS 26.0 release build. The App Data reader
+        // gates iOS 26 by version (26.0 / 26.6.1); the entry below only
+        // resolves the version label.
+        "23a340": ("26.0", [.stable]),
+
         // MARK: iOS 26.6 family
         // best-effort: RC build seen on ipsw.dev; public 26.6 build unverified
         // (point-release RCs are usually identical to the public build).
