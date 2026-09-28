@@ -33,6 +33,7 @@
 			children = (
 				000000000000000000000010 /* WorkPlot */,
 				000000000000000000000020 /* Products */,
+				CC0000000000000000000002 /* AirliftFFI.xcframework */,
 			);
 			sourceTree = "<group>";
 		};
