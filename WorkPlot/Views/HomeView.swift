@@ -146,11 +146,11 @@ struct HomeView: View {
             } else {
                 let tweaks = store.tweaks.filter { $0.category != .ai && matchesSearch($0.title) }
                 let tools = toolDefs.filter { $0.id != "respring" && matchesSearch($0.title) }
-                var cells: [FlatCell] = []
-                var ti = 0, to = 0
-                while ti < tweaks.count || to < tools.count {
-                    if ti < tweaks.count { cells.append(.tweak(tweaks[ti])); ti += 1 }
-                    if to < tools.count { cells.append(.tool(tools[to])); to += 1 }
+                // Interleave tweaks and tools. (A `while` loop can't be used
+                // here: result builders don't allow control-flow statements.)
+                let cells: [FlatCell] = (0..<max(tweaks.count, tools.count)).reduce(into: []) { acc, i in
+                    if i < tweaks.count { acc.append(.tweak(tweaks[i])) }
+                    if i < tools.count { acc.append(.tool(tools[i])) }
                 }
                 SectionHeader("All capabilities", detail: "\(cells.count) available")
                 cellList(cells)
