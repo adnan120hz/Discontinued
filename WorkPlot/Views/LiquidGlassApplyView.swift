@@ -27,7 +27,195 @@ struct LiquidGlassApplyView: View {
     }
 
     private var isIOS27Flow: Bool { model.flow == .fullBackup }
-    private var backupMissing: Bool { isIOS27Flow && model.backupInfo == nil }
+    private var backupMissing: Bool {
+        isIOS27Flow && model.backupInfo == nil && model.backupMode != .fullDevice
+    }
+
+    // MARK: - Full backup (iOS 27, GoldenNugget-style)
+
+    /// Prerequisites + backup-mode status for the full-device backup path.
+    /// Honest copy: when the on-device AirLift channel is not ready, the UI
+    /// says Backup will take a preference snapshot instead — never a full
+    /// device backup it cannot do. Nothing here claims an automatic
+    /// restore-on-reboot: the restore is the step that applies the tweaks,
+    /// and the reboot afterwards is manual.
+    private var fullBackupCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader("Full Backup")
+            switch model.backupMode {
+            case .fullDevice:
+                modeStatusRow(icon: "externaldrive.fill",
+                              title: "Full device backup",
+                              detail: "Pulled from the device over the AirLift channel, " +
+                                      "GoldenNugget-style. The working backup is temporary — " +
+                                      "it is wiped when the next backup runs, so restore " +
+                                      "before backing up again.")
+            case .preferenceSnapshot:
+                modeStatusRow(icon: "doc.fill",
+                              title: "Preference snapshot — not a full device backup",
+                              detail: "Covers the liquid-glass preference files only. " +
+                                      "The full-device path needs the on-device AirLift " +
+                                      "channel, which is not ready yet.")
+            case nil:
+                prerequisitesList
+            }
+        }
+        .padding(16)
+        .wsCard(cornerRadius: 18)
+    }
+
+    private var prerequisitesList: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Before you press Backup, make sure:")
+                .font(.subheadline.weight(.semibold))
+            prerequisiteRow(icon: "wifi",
+                            text: "The device is on Wi-Fi.",
+                            live: nil)
+            prerequisiteRow(icon: "cable.connector",
+                            text: "The loopback tunnel / VPN app is running.",
+                            live: model.tunnelUp)
+            prerequisiteRow(icon: "link",
+                            text: "AirLift is paired (see the AirLift tab).",
+                            live: model.airliftPaired)
+            prerequisiteRow(icon: "eye.slash",
+                            text: "Find My is turned off.",
+                            live: nil)
+            prerequisiteRow(icon: "book.closed",
+                            text: "Apple Books is installed (where applicable).",
+                            live: nil)
+            if !model.channelReady {
+                Text("The on-device AirLift channel is not ready yet" +
+                     (model.channelNote.map { " (\($0))" } ?? "") +
+                     " — Backup will take a preference snapshot instead: " +
+                     "the liquid-glass preference files only, not a full device backup.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.caution)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text("Backup captures the current state — press it before applying tweaks.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func prerequisiteRow(icon: String, text: String, live: Bool?) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: prerequisiteIcon(live))
+                .font(.body.weight(.semibold))
+                .foregroundStyle(prerequisiteColor(live))
+                .frame(width: 22)
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func prerequisiteIcon(_ live: Bool?) -> String {
+        switch live {
+        case .some(true): return "checkmark.circle.fill"
+        case .some(false): return "xmark.circle.fill"
+        case nil: return "circle"
+        }
+    }
+
+    private func prerequisiteColor(_ live: Bool?) -> Color {
+        switch live {
+        case .some(true): return Theme.affirmative
+        case .some(false): return Theme.destructive
+        case nil: return .secondary
+        }
+    }
+
+    private func modeStatusRow(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.white)
+                .frame(width: 40, height: 40)
+                .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: - Media safety copy
+
+    /// AFC photo/video safety copy (iOS 27 full-backup flow). Pure copy —
+    /// the device originals are never deleted by this backup.
+    private var mediaCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader("Photo & video safety copy")
+            Text("Copies DCIM and PhotoStreamsData over AFC into this app's storage. " +
+                 "Each file is verified before anything is removed — and this backup " +
+                 "never removes the device originals.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.title3)
+                    .foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Media store")
+                        .font(.subheadline.weight(.semibold))
+                    Text(model.mediaInfo?.summary ?? "No media stored.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            if model.mediaBusy, let progress = model.taskProgress {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text(progress)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            HStack(spacing: 12) {
+                ActionButton(title: "Pull media",
+                             systemImage: "arrow.down.to.line",
+                             isBusy: model.mediaBusy,
+                             disabled: !model.channelReady) {
+                    model.pullMedia()
+                }
+                ActionButton(title: "Push back",
+                             systemImage: "arrow.up.to.line",
+                             isBusy: false,
+                             disabled: model.mediaInfo == nil || model.mediaBusy || !model.channelReady) {
+                    model.pushMediaBack()
+                }
+            }
+            .opacity(model.channelReady ? 1 : 0.45)
+            secondaryButton(title: "Empty store",
+                            systemImage: "trash",
+                            tint: Theme.destructive,
+                            disabled: model.mediaInfo == nil || model.mediaBusy,
+                            action: { model.emptyMediaStore() })
+            if !model.channelReady {
+                Text("Media actions need the device channel — pair AirLift and bring the tunnel up first.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.caution)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .wsCard(cornerRadius: 18)
+    }
 
     var body: some View {
         ScrollView {
@@ -35,7 +223,13 @@ struct LiquidGlassApplyView: View {
                 disclaimerCard
                 introCard
                 tweaksCard
+                if isIOS27Flow {
+                    fullBackupCard
+                }
                 flowCard
+                if isIOS27Flow {
+                    mediaCard
+                }
             }
             .padding(Theme.pagePadding)
         }
@@ -46,7 +240,7 @@ struct LiquidGlassApplyView: View {
         .onAppear { model.refresh() }
         .overlay {
             if model.isBusy {
-                ProgressOverlay(message: isIOS27Flow ? "Working…" : "Applying…")
+                ProgressOverlay(message: model.taskProgress ?? (isIOS27Flow ? "Working…" : "Applying…"))
             }
         }
     }
@@ -145,6 +339,15 @@ struct LiquidGlassApplyView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             statusRow
+            if model.isBusy, let progress = model.taskProgress {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text(progress)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 12) {
                     backupButton
@@ -200,6 +403,12 @@ struct LiquidGlassApplyView: View {
     private var backupStatusText: String {
         switch model.flow {
         case .fullBackup:
+            if model.backupMode == .fullDevice {
+                return "Full device backup ready — Apply will inject and restore."
+            }
+            if model.backupMode == .preferenceSnapshot {
+                return "Preference snapshot ready — not a full device backup."
+            }
             if let info = model.backupInfo {
                 let size = ByteCountFormatter.string(fromByteCount: Int64(info.totalBytes), countStyle: .file)
                 return "Backup from \(info.createdAt.formatted(date: .abbreviated, time: .shortened)) • \(size)"
@@ -239,20 +448,43 @@ struct LiquidGlassApplyView: View {
 
     private var restoreButton: some View {
         secondaryButton(
-            title: model.flow == .partialRestore ? "Undo last apply" : "Restore full backup",
+            title: restoreTitle,
             systemImage: "arrow.uturn.backward",
             tint: Theme.destructive,
             disabled: restoreDisabled,
             action: { model.restore() }
         )
-        .accessibilityHint(model.flow == .partialRestore
-                           ? "Revert the last partial-restore apply"
-                           : "Restore the pristine liquid-glass backup")
+        .accessibilityHint(restoreHint)
+    }
+
+    private var restoreTitle: String {
+        switch model.flow {
+        case .fullBackup:
+            return model.backupMode == .fullDevice ? "Restore pristine files" : "Restore full backup"
+        case .partialRestore:
+            return "Undo last apply"
+        case .unsupported:
+            return "Restore"
+        }
+    }
+
+    private var restoreHint: String {
+        switch model.flow {
+        case .fullBackup:
+            return model.backupMode == .fullDevice
+                ? "Restore the pristine liquid-glass files stashed at backup time"
+                : "Restore the pristine liquid-glass backup"
+        case .partialRestore:
+            return "Revert the last partial-restore apply"
+        case .unsupported:
+            return "Restore"
+        }
     }
 
     private var restoreDisabled: Bool {
         switch model.flow {
-        case .fullBackup: return model.backupInfo == nil
+        case .fullBackup:
+            return model.backupInfo == nil && model.backupMode != .fullDevice
         case .partialRestore: return !model.canUndoPartial
         case .unsupported: return true
         }
