@@ -137,22 +137,19 @@ enum WorkSlopSupport {
 
     /// App Data reader via bad_query.
     ///
-    /// Supported on iOS 18.x (any build), iOS 26.0 and 26.6.1, and
-    /// iOS 27.0 dev beta 1–4 / public beta 1–2 (the same build-channel
-    /// window as ``mobileGestaltAvailable()``).
+    /// Supported on iOS 18.x (any build: 18.0, 18.6, ...), iOS 26.x
+    /// (26.0, 26.3, 26.6, 26.6.1 incl. RC, 26.6.2), and iOS 27.0
+    /// dev beta 1-4 / public beta 1-2 / RC / stable.
     ///
-    /// iOS 26 is gated by marketing version; iOS 18 by major version;
-    /// iOS 27 by build channel from the build-code database. Unknown or
-    /// unparseable 27.x builds are treated as SUPPORTED (fail-open),
-    /// matching the other predicates — no patched 27.x build inside this
-    /// window has been confirmed. Everything else is unsupported.
+    /// iOS 26 is gated by major version only (bad_query works across
+    /// 26.x per FilzaSlop); iOS 18 by major version; iOS 27 by build
+    /// channel from the build-code database. Unknown or unparseable
+    /// 27.x builds are treated as SUPPORTED (fail-open). Everything
+    /// else is unsupported.
     static func appDataAvailable() -> Bool {
         let v = currentVersion
         if v.majorVersion == 18 { return true }
-        if v.majorVersion == 26 {
-            return (v.minorVersion == 0 && v.patchVersion == 0)
-                || (v.minorVersion == 6 && v.patchVersion == 1)
-        }
+        if v.majorVersion == 26 { return true }
         guard isIOS27() else { return false }
         guard let channels = buildChannels() else { return true }
         if channels.isEmpty { return true }
@@ -160,7 +157,8 @@ enum WorkSlopSupport {
             switch channel {
             case .devBeta(let n): return (1...4).contains(n)
             case .publicBeta(let n): return (1...2).contains(n)
-            case .rc, .stable, .unknown: return false
+            case .rc, .stable: return true
+            case .unknown: return false
             }
         }
     }

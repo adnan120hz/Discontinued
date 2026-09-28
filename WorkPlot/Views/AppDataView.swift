@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 /// real bad_query lease probe; a failed probe reports an error instead of
 /// showing an empty list.
 ///
-/// Supported on iOS 18.x, 26.0 / 26.6.1, and 27.0 dev beta 1–4 /
+/// Supported on iOS 18.x, 26.x, and 27.0 dev beta 1-4 /
 /// public beta 1–2. On other builds the view explains why it is unavailable
 /// instead of pretending to work.
 ///
@@ -174,7 +174,7 @@ public struct AppDataView: View {
             Text(reason)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Text("Supported: iOS 18.x, 26.0 / 26.6.1, 27.0 dev beta 1–4 / public beta 1–2.")
+            Text("Supported: iOS 18.x, 26.x, 27.0 dev beta 1-4 / public beta 1-2 / RC / stable.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -216,7 +216,7 @@ public struct AppDataView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text("Supported: iOS 18.x, 26.0 / 26.6.1, 27.0 dev beta 1–4 / public beta 1–2.")
+                Text("Supported: iOS 18.x, 26.x, 27.0 dev beta 1-4 / public beta 1-2 / RC / stable.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
