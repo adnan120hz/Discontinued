@@ -83,6 +83,34 @@ enum ZipExtractor {
     }
 }
 
+// MARK: - Theme Zip Helpers (shared by Dialer / Passcode flows)
+
+/// macOS Finder metadata directory inside zips. These are never real theme
+/// assets — writing them fails on-device and pollutes the destination.
+private let macOSXPrefix = "__MACOSX/"
+
+/// Prepares extracted zip entries for writing to a theme destination:
+/// - Drops `__MACOSX/` metadata entries and directories.
+/// - If every file lives under a single top-level folder (e.g.
+///   `TelephonyUI-10-cute-cat/`), strips that prefix so assets land directly
+///   in the destination (AirCard-iOS writes PNGs flat into TelephonyUI-10).
+/// Returns `(relativePath, data)` pairs ready to append to the destination.
+func themeWritePairs(from entries: [ZipEntry]) -> [(String, Data)] {
+    var files = entries.filter { !$0.isDirectory }
+    files.removeAll { $0.name.hasPrefix(macOSXPrefix) || $0.name.contains("/__MACOSX/") }
+    guard !files.isEmpty else { return [] }
+    // Strip single top-level folder if all files share it.
+    let tops = Set(files.map { $0.name.split(separator: "/").first.map(String.init) ?? "" })
+    var pairs = files.map { ($0.name, $0.data) }
+    if tops.count == 1, let top = tops.first, !top.isEmpty,
+       files.allSatisfy({ $0.name.hasPrefix(top + "/") }) {
+        let prefix = top + "/"
+        pairs = files.map { (String($0.name.dropFirst(prefix.count)), $0.data) }
+    }
+    // Drop any entries that became empty after stripping.
+    return pairs.filter { !$0.0.isEmpty }
+}
+
 
 // MARK: - DialerThemeView
 
@@ -96,16 +124,14 @@ struct DialerThemeView: View {
     @State private var status: String?
     @State private var isApplying = false
 
-    // MARK: Destination (NOT device-verified)
+    // MARK: Destination (per AirCard-iOS)
     //
-    /// Root under which extracted dialer assets are written.
-    ///
-    /// NOT device-verified: on iOS 26.6–26.7 the Phone app's data container
-    /// UUID varies per device. Before shipping, resolve the real container
-    /// on-device (list /var/mobile/Containers/Data/Application over the
-    /// bad_query lease and match the Phone bundle) and narrow this path.
-    /// Until then the flow is reviewable end-to-end but the files land here.
-    static let phoneDataContainerPath = "/var/mobile/Containers/Data/Application"
+    /// Dialer theme asset location, per AirCard-iOS
+    /// (Mak5er/AirCard-iOS, MIT): telephony UI assets are read by iOS from
+    /// `/var/mobile/Library/Caches/TelephonyUI-10` on iOS 18+. The extracted
+    /// PNGs are written directly there (single top-level theme folder is
+    /// stripped; `__MACOSX/` metadata is skipped).
+    static let dialerThemeDestinationPath = "/var/mobile/Library/Caches/TelephonyUI-10"
 
     private var isSupportedOS: Bool { WorkSlopSupport.legacyPosterBoardAvailable() }
     private var files: [ZipEntry] { entries.filter { !$0.isDirectory } }
@@ -211,7 +237,7 @@ struct DialerThemeView: View {
     private var applyCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader("Apply")
-            Text("Writes every file to \(Self.phoneDataContainerPath), preserving the zip's folder structure.")
+            Text("Writes the theme assets to \(Self.dialerThemeDestinationPath) (per AirCard-iOS).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             ActionButton(title: "Apply Dialer Theme",
@@ -235,7 +261,7 @@ struct DialerThemeView: View {
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("Info")
-            Text("ZIPFoundation extracts stored and deflate entries and verifies CRC32; unsafe paths (zip-slip) are rejected. Destination path is not device-verified yet (see code comment).")
+            Text("ZIPFoundation extracts stored and deflate entries and verifies CRC32; unsafe paths (zip-slip) are rejected. Theme assets are written to /var/mobile/Library/Caches/TelephonyUI-10 (per AirCard-iOS); __MACOSX/ metadata entries are skipped.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -283,21 +309,24 @@ struct DialerThemeView: View {
         status = nil
         // Off the main thread; AirLiftFileWriter is synchronous file I/O.
         DispatchQueue.global(qos: .userInitiated).async {
+            // Per AirCard-iOS: dialer PNGs go to TelephonyUI-10. Skip
+            // __MACOSX/ metadata and strip a single top-level theme folder.
+            let pairs = themeWritePairs(from: files)
             var failures: [String] = []
-            for entry in files {
-                let dest = (Self.phoneDataContainerPath as NSString)
-                    .appendingPathComponent(entry.name)
+            for (relPath, data) in pairs {
+                let dest = (Self.dialerThemeDestinationPath as NSString)
+                    .appendingPathComponent(relPath)
                 do {
-                    try AirLiftFileWriter.writeFile(data: entry.data, to: dest)
+                    try AirLiftFileWriter.writeFile(data: data, to: dest)
                 } catch {
-                    failures.append("\(entry.name): \(error.localizedDescription)")
+                    failures.append("\(relPath): \(error.localizedDescription)")
                 }
             }
             let message: String
             if failures.isEmpty {
-                message = "Applied \(files.count) files. Respring to take effect."
+                message = "Applied \(pairs.count) files. Respring to take effect."
             } else {
-                message = "Failed: \(failures.count) of \(files.count) writes failed. First: \(failures[0])"
+                message = "Failed: \(failures.count) of \(pairs.count) writes failed. First: \(failures[0])"
             }
             DispatchQueue.main.async {
                 status = message
@@ -334,11 +363,9 @@ struct AirLiftDialerThemeView: View {
     @State private var status: String?
     @State private var isApplying = false
 
-    /// Destination for the AirLift dialer-theme assets, per AirCard-iOS:
-    /// the Phone app's telephony UI asset location.
-    ///
-    /// NOT device-verified by us: confirm on a test device that the target
-    /// iOS 27.x build reads dialer assets from here.
+    /// Destination for the AirLift dialer-theme assets, per AirCard-iOS
+    /// (Mak5er/AirCard-iOS, MIT): iOS reads telephony UI assets from
+    /// `/var/mobile/Library/Caches/TelephonyUI-10` on iOS 18+.
     static let airLiftDialerStagingPath = "/var/mobile/Library/Caches/TelephonyUI-10"
 
     private var isAvailableVersion: Bool { airLiftDialerAvailable }
@@ -497,7 +524,7 @@ struct AirLiftDialerThemeView: View {
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("Info")
-            Text("This is the AirLift pairing-path dialer theme for iOS 27.0 (RC / dev beta 5+ / public beta 2+ / stable). The separate iOS 26.6–26.7 bad_query dialer view is unchanged. ZIPFoundation extracts with CRC32 verification; zip-slip paths are rejected. Destination path is not device-verified yet (see code comment).")
+            Text("This is the AirLift pairing-path dialer theme for iOS 27.0 (RC / dev beta 5+ / public beta 2+ / stable). The separate iOS 26.6–26.7 bad_query dialer view is unchanged. ZIPFoundation extracts with CRC32 verification; zip-slip paths are rejected. Assets are written to /var/mobile/Library/Caches/TelephonyUI-10 (per AirCard-iOS); __MACOSX/ metadata entries are skipped.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -545,14 +572,17 @@ struct AirLiftDialerThemeView: View {
         // Group by parent directory: one AirLift sync session per directory
         // instead of one per file (each session replays the full tunnel +
         // Books-sync flow), preserving the zip's folder structure.
+        // __MACOSX/ metadata is skipped; a single top-level theme folder
+        // is stripped (per AirCard-iOS the PNGs land in TelephonyUI-10).
         DispatchQueue.global(qos: .userInitiated).async {
+            let pairs = themeWritePairs(from: files)
             var failures: [String] = []
             var byDirectory: [String: [(name: String, data: Data)]] = [:]
-            for entry in files {
-                let parent = ((entry.name as NSString).deletingLastPathComponent as NSString)
+            for (relPath, data) in pairs {
+                let parent = ((relPath as NSString).deletingLastPathComponent as NSString)
                     .standardizingPath
-                let leaf = (entry.name as NSString).lastPathComponent
-                byDirectory[parent, default: []].append((name: leaf, data: entry.data))
+                let leaf = (relPath as NSString).lastPathComponent
+                byDirectory[parent, default: []].append((name: leaf, data: data))
             }
             for (parent, group) in byDirectory {
                 let destDir: String
@@ -570,7 +600,7 @@ struct AirLiftDialerThemeView: View {
             }
             let message: String
             if failures.isEmpty {
-                message = "Applied \(files.count) files in \(byDirectory.count) sync sessions. Respring to take effect."
+                message = "Applied \(pairs.count) files in \(byDirectory.count) sync sessions. Respring to take effect."
             } else {
                 message = "Failed: \(failures.count) of \(byDirectory.count) directories failed. First: \(failures[0])"
             }

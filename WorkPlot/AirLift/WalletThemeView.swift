@@ -24,12 +24,11 @@ struct WalletThemeView: View {
 
     // MARK: Destination (per AirCard-iOS)
     //
-    /// Wallet card-art destination root, per AirCard-iOS: the custom image
-    /// is written into `/var/mobile/Library/Passes/Cards/<card-id>.pkpass`,
-    /// where `<card-id>` is the attached card's filename without extension.
-    ///
-    /// NOT device-verified by us: confirm on a test device that the target
-    /// iOS build reads card art from this location.
+    /// Wallet card-art destination, per AirCard-iOS (Mak5er/AirCard-iOS,
+    /// MIT, `AppViewModel.swift`): card skins are written into
+    /// `/var/mobile/Library/Passes/Cards/<card-id>.pkpass`, where
+    /// `<card-id>` is the card identifier (filename without extension).
+    /// AirCard-iOS also invalidates `<card-id>.cache` / `<card-id>.pkcache`.
     static let walletCardsRootPath = "/var/mobile/Library/Passes/Cards"
 
     /// Destination directory for the attached card's artwork.
@@ -236,7 +235,7 @@ struct WalletThemeView: View {
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("Info")
-            Text("Card attachment is persisted across launches (the .pkpass is copied into the app sandbox). The VPN gate is enforced with VPNCheck.requireVPN()-style utun detection (no entitlements needed) and the flow blocks with an explanation when no local dev VPN is active. The custom image is written through AirLiftFileWriter into the card's .pkpass directory (per AirCard-iOS); the exact card-art location is not device-verified by us (see code comment).")
+            Text("Card attachment is persisted across launches (the .pkpass is copied into the app sandbox). The VPN gate is enforced with VPNCheck.requireVPN()-style utun detection (no entitlements needed) and the flow blocks with an explanation when no local dev VPN is active. The custom image is written through AirLiftFileWriter into /var/mobile/Library/Passes/Cards/<card-id>.pkpass (per AirCard-iOS).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

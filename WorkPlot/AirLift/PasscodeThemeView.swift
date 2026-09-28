@@ -28,15 +28,14 @@ struct PasscodeThemeView: View {
     /// dynamic exported type — good enough as the document picker filter.
     private static let passthmType = UTType(filenameExtension: "passthm") ?? .data
 
-    // MARK: Destination (NOT device-verified)
+    // MARK: Destination (per AirCard-iOS)
     //
-    /// Staging path for the passcode theme asset bundle.
-    ///
-    /// NOT device-verified: the exact SpringBoard passcode asset location on
-    /// iOS 26.6–27.x still needs on-device confirmation. Files are staged here
-    /// so the flow (gate → pick → write) is reviewable end-to-end; narrow this
-    /// path once the real asset location is confirmed on a test device.
-    static let passcodeThemeStagingPath = "/var/mobile/Library/Caches/WorkSlopPasscodeTheme"
+    /// Passcode theme asset location, per AirCard-iOS (Mak5er/AirCard-iOS,
+    /// MIT): a `.passthm` file is a zip of keypad PNGs. AirCard-iOS extracts
+    /// it and writes the PNGs to `/var/mobile/Library/Caches/TelephonyUI-10`
+    /// — the same location iOS reads telephony UI assets from on iOS 18+.
+    /// `__MACOSX/` metadata entries are skipped.
+    static let passcodeThemeDestinationPath = "/var/mobile/Library/Caches/TelephonyUI-10"
 
     /// Gate state evaluated live for the UI.
     private var gate: PasscodeGate {
@@ -191,7 +190,7 @@ struct PasscodeThemeView: View {
     private var applyCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader("Apply")
-            Text("Writes the theme file to the staging path via AirLiftFileWriter.")
+            Text("Extracts the .passthm and writes the keypad assets to \(Self.passcodeThemeDestinationPath) via AirLiftFileWriter (per AirCard-iOS).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             ActionButton(title: "Apply Passcode Theme",
@@ -208,7 +207,7 @@ struct PasscodeThemeView: View {
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("Info")
-            Text("The theme MUST be a .passthm file — other extensions are rejected with an explanation. The VPN gate is enforced with VPNCheck.requireVPN() (utun interface detection, no entitlements needed) and the flow blocks with an explanation when no local dev VPN is active. Destination path is not device-verified yet (see code comment).")
+            Text("The theme MUST be a .passthm file — other extensions are rejected with an explanation. The VPN gate is enforced with VPNCheck.requireVPN() (utun interface detection, no entitlements needed) and the flow blocks with an explanation when no local dev VPN is active. The .passthm is extracted on-device and its assets are written to /var/mobile/Library/Caches/TelephonyUI-10 (per AirCard-iOS).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -260,12 +259,31 @@ struct PasscodeThemeView: View {
         isApplying = true
         status = nil
         DispatchQueue.global(qos: .userInitiated).async {
-            let dest = (Self.passcodeThemeStagingPath as NSString)
-                .appendingPathComponent(name)
             let message: String
             do {
-                try AirLiftFileWriter.writeFile(data: data, to: dest)
-                message = "Applied \(name). Respring to take effect."
+                // A .passthm is a zip of keypad PNGs (per AirCard-iOS).
+                // Extract on-device, skip __MACOSX/, and write the assets
+                // to TelephonyUI-10 — the location iOS reads them from.
+                let entries = try ZipExtractor.extract(data)
+                let pairs = themeWritePairs(from: entries)
+                guard !pairs.isEmpty else {
+                    throw ZipExtractorError.invalidArchive("no theme assets found in \(name)")
+                }
+                var failures: [String] = []
+                for (relPath, fileData) in pairs {
+                    let dest = (Self.passcodeThemeDestinationPath as NSString)
+                        .appendingPathComponent(relPath)
+                    do {
+                        try AirLiftFileWriter.writeFile(data: fileData, to: dest)
+                    } catch {
+                        failures.append("\(relPath): \(error.localizedDescription)")
+                    }
+                }
+                if failures.isEmpty {
+                    message = "Applied \(name) (\(pairs.count) assets). Respring to take effect."
+                } else {
+                    message = "Failed: \(failures.count) of \(pairs.count) writes failed. First: \(failures[0])"
+                }
             } catch {
                 message = "Failed: \(error.localizedDescription)"
             }
