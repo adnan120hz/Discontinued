@@ -52,10 +52,11 @@ enum Theme {
 
     // MARK: - WorkSlop light-blue design language
     //
-    // Solid surfaces only — no Liquid Glass, no translucent materials, no
-    // gradients. Cards are solid light blue with a blue-tinted border and a
-    // soft drop shadow; the page itself is a lighter blue wash. Radii are
-    // kept modest (12–18pt) for a neat, professional feel.
+    // Light-blue surfaces with iOS 26 Liquid Glass materials and fluid
+    // continuous corners on navigation chrome (see wsGlassPanel in
+    // RootView.swift, with a solid fallback below iOS 26). Cards are light
+    // blue with a blue-tinted border and a soft drop shadow; the page itself
+    // is a lighter blue wash. Neat and professional throughout.
 
     /// Brand blue used for banners, primary actions and highlights.
     static let wsBlue = Color(red: 0.16, green: 0.44, blue: 0.85)
