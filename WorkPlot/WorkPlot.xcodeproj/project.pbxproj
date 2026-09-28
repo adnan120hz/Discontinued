@@ -18,13 +18,11 @@
 		000000000000000130000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
-				CC0000000000000000000001 /* AirliftFFI.xcframework in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXBuildFile section */
-		CC0000000000000000000001 /* AirliftFFI.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000002 /* AirliftFFI.xcframework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXGroup section */
@@ -33,7 +31,6 @@
 			children = (
 				000000000000000000000010 /* WorkPlot */,
 				000000000000000000000020 /* Products */,
-				CC0000000000000000000002 /* AirliftFFI.xcframework */,
 			);
 			sourceTree = "<group>";
 		};
@@ -73,7 +70,6 @@
 
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* WorkPlot.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WorkPlot.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		CC0000000000000000000002 /* AirliftFFI.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = "AirLift/RustCore/AirliftFFI.xcframework"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXProject section */
