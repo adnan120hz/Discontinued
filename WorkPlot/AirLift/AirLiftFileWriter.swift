@@ -33,7 +33,7 @@ enum AirLiftWriteError: LocalizedError {
 /// ## iOS 27+ — genuine on-device AirLift
 /// `writeFiles(_:toDirectory:)` stages the files in a temp dir and calls
 /// `al_exploit_write_dir` from the bundled Rust core (ported from
-/// AirCard-iOS, Mak5er, MIT — see `WorkPlot/AirLift/RustCore/`). The phone
+/// AirCard-iOS, Mak5er, MIT — see `RustCore/`). The phone
 /// talks to ITSELF over a loopback tunnel (LocalDevVPN → `10.7.0.1`,
 /// `127.0.0.1` fallback): StreamingZip symlink → stage via
 /// `streaming_zip_conduit` → forged `Books/Sync/Books.plist` via AFC → the

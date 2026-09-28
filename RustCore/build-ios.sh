@@ -6,7 +6,7 @@
 #
 # CI runs the equivalent steps inline (device slice only) in
 # .github/workflows/main.yml before the Xcode archive. Run this script
-# locally any time WorkPlot/AirLift/RustCore/ changes.
+# locally any time RustCore/ changes.
 set -euo pipefail
 
 export IPHONEOS_DEPLOYMENT_TARGET="${IPHONEOS_DEPLOYMENT_TARGET:-17.0}"

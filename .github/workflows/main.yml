@@ -24,19 +24,19 @@ jobs:
           IPHONEOS_DEPLOYMENT_TARGET: "17.0"
         run: |
           rustup target add aarch64-apple-ios
-          cd WorkPlot/AirLift/RustCore
+          cd RustCore
           cargo build --release --target aarch64-apple-ios
 
       - name: Package AirliftFFI.xcframework
         run: |
-          rm -rf WorkPlot/AirLift/RustCore/AirliftFFI.xcframework
+          rm -rf RustCore/AirliftFFI.xcframework
           xcodebuild -create-xcframework \
-            -library WorkPlot/AirLift/RustCore/target/aarch64-apple-ios/release/libairlift_ffi.a \
-            -headers WorkPlot/AirLift/RustCore/include \
-            -output WorkPlot/AirLift/RustCore/AirliftFFI.xcframework
-          # Drop the raw cargo artifacts so Xcode's file-synced groups don't
-          # link the bare static lib in addition to the xcframework.
-          rm -rf WorkPlot/AirLift/RustCore/target
+            -library RustCore/target/aarch64-apple-ios/release/libairlift_ffi.a \
+            -headers RustCore/include \
+            -output RustCore/AirliftFFI.xcframework
+          # Drop the raw cargo artifacts; the Rust tree lives outside the
+          # Xcode-synced WorkPlot/ dir so nothing leaks into the app bundle.
+          rm -rf RustCore/target
 
       - name: Build unsigned archive
         run: |
