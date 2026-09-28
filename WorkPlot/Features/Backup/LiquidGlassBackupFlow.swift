@@ -338,7 +338,7 @@ final class LiquidGlassApplyModel: ObservableObject {
             }
             do {
                 let result = try await LGBackupEngine.shared.runBackup { message in
-                    taskProgress = message
+                    self.taskProgress = message
                 }
                 backupMode = result.mode
                 warnings = []

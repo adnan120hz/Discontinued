@@ -109,12 +109,12 @@ final class AirLiftManager: ObservableObject {
     // MARK: - Pairing-file discovery
 
     /// Canonical in-app pairing path.
-    static func canonicalPairingPath() -> String {
+    nonisolated static func canonicalPairingPath() -> String {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("workslop_pairing.plist").path
     }
 
-    private static func nonEmptyFileSize(at path: String) -> Int {
+    nonisolated private static func nonEmptyFileSize(at path: String) -> Int {
         guard FileManager.default.fileExists(atPath: path) else { return 0 }
         return (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? 0
     }

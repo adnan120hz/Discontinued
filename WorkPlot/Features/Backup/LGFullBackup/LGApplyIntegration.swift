@@ -42,7 +42,7 @@ extension LiquidGlassApplyModel {
             }
             do {
                 let count = try await LGBackupEngine.shared.applyFullDevice(tweaks: tweaks) { message in
-                    taskProgress = message
+                    self.taskProgress = message
                 }
                 lastChangedFiles = count
                 warnings = []
@@ -73,7 +73,7 @@ extension LiquidGlassApplyModel {
             }
             do {
                 try await LGBackupEngine.shared.restoreFullDevice { message in
-                    taskProgress = message
+                    self.taskProgress = message
                 }
                 warnings = []
                 statusMessage = "Pristine files restored. " +
@@ -101,7 +101,7 @@ extension LiquidGlassApplyModel {
             }
             do {
                 let manifest = try await LGBackupEngine.shared.pullMedia { message in
-                    taskProgress = message
+                    self.taskProgress = message
                 }
                 mediaInfo = LGMediaStore.info()
                 warnings = []
@@ -126,7 +126,7 @@ extension LiquidGlassApplyModel {
             }
             do {
                 try await LGBackupEngine.shared.pushMediaBack { message in
-                    taskProgress = message
+                    self.taskProgress = message
                 }
                 warnings = []
                 statusMessage = "Push-back finished. Check the log lines above for any skipped files."

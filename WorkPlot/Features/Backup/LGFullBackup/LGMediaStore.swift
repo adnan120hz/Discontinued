@@ -257,7 +257,7 @@ enum LGMediaStore {
             // Every ancestor must exist before the leaf: one make-directory
             // call for "/DCIM/100APPLE" fails when "/DCIM" is absent.
             for directory in ancestors(of: entry.source) {
-                try? await channel.afcMakeDirectory(path: directory)
+                try? await channel.afcMakeDirectory(directory)
             }
 
             let data = try Data(contentsOf: local)
