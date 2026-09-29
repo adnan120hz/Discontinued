@@ -31,7 +31,7 @@ enum LiquidGlassTweaks {
                                   key: "SolariumForceFallback",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             maxIOS: "26.99",
             modifications: [],
         ),
@@ -48,7 +48,7 @@ enum LiquidGlassTweaks {
                                   key: "com.apple.SwiftUI.IgnoreSolariumLinkedOnCheck",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(
@@ -192,7 +192,7 @@ enum LiquidGlassTweaks {
                                   key: "SBDisallowGlassTime",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(
@@ -208,7 +208,7 @@ enum LiquidGlassTweaks {
                                   key: "SBDisableGlassDock",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(
@@ -224,7 +224,7 @@ enum LiquidGlassTweaks {
                                   key: "SBDisableSpecularEverywhereUsingLSSAssertion",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(
@@ -240,7 +240,7 @@ enum LiquidGlassTweaks {
                                   key: "SolariumDisableOuterRefraction",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(
@@ -256,7 +256,7 @@ enum LiquidGlassTweaks {
                                   key: "SolariumAllowHDR",
                                   value: .bool(false))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(
@@ -272,7 +272,7 @@ enum LiquidGlassTweaks {
                                   key: "SBDisableWidgetSpecular",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(
@@ -288,7 +288,7 @@ enum LiquidGlassTweaks {
                                   key: "SBDisableDockSpecular",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(
@@ -304,7 +304,7 @@ enum LiquidGlassTweaks {
                                   key: "SBDisableFolderSpecular",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(
@@ -320,7 +320,7 @@ enum LiquidGlassTweaks {
                                   key: "SBExcludeAllClearGlassShadows",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(
@@ -336,7 +336,7 @@ enum LiquidGlassTweaks {
                                   key: "SBExcludeDockShadow",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(
@@ -352,7 +352,7 @@ enum LiquidGlassTweaks {
                                   key: "SBExcludeSearchShadow",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(
@@ -368,7 +368,7 @@ enum LiquidGlassTweaks {
                                   key: "SBUseFlatIconsEverywhere",
                                   value: .bool(true))
             ],
-            minIOS: "26.0",
+            minIOS: "26.2",
             modifications: [],
         ),
         Tweak(

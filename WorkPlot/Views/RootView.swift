@@ -60,7 +60,7 @@ struct MainTabView: View {
             NavigationStack {
                 LiquidGlassApplyView()
             }
-            .tabItem { Label("Liquid Glass", systemImage: "drop.fill") }
+            .tabItem { Label("Liquid Glass 26.2+", systemImage: "drop.fill") }
             NavigationStack {
                 AirLiftPairingView()
             }

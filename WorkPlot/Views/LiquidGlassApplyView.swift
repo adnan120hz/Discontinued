@@ -235,7 +235,7 @@ struct LiquidGlassApplyView: View {
         }
         .scrollIndicators(.hidden)
         .background(Theme.page)
-        .navigationTitle("Liquid Glass Tweaks")
+        .navigationTitle("Liquid Glass Tweaks iOS 26.2+")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { model.refresh() }
         .overlay {
@@ -256,7 +256,7 @@ struct LiquidGlassApplyView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Experimental — use at your own risk")
                     .font(.headline)
-                Text("Liquid Glass tweaks are experimental. They were made as optimal and safe as possible, but errors can still happen — any damage or data loss that results is entirely your own responsibility. Back up your data before applying anything here.")
+                Text("Liquid Glass tweaks are experimental. They were made as optimal and safe as possible, but errors can still happen — any damage or data loss that results is entirely your own responsibility. Back up your data before applying anything here.\n\nWant iOS 18 UI style? Use the Disable Liquid Glass tweak in Other Exploit (DarkSword) — only for iOS 26.0.1/26.1.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -285,7 +285,7 @@ struct LiquidGlassApplyView: View {
 
     private var tweaksCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeader("Liquid Glass tweaks", detail: "\(lgTweaks.count) available")
+            SectionHeader("Liquid Glass tweaks iOS 26.2+ (NO iOS 18 UI)", detail: "\(lgTweaks.count) available")
             if lgTweaks.isEmpty {
                 Text("No Liquid Glass tweaks are offered on this iOS version.")
                     .font(.subheadline)
