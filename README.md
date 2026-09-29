@@ -84,8 +84,7 @@ Third-party components and their licenses are listed in [THIRD_PARTY_NOTICES.md]
 
 ## 🙏 Credits
 
-- **adnan.120hz** — WorkSlop developer & maintainer
-- **Gievano** ([gievano/WorkPlot](https://github.com/gievano/WorkPlot)) — Original WorkPlot app that WorkSlop is based on
+- **Adnan.120hz & Gievano** — WorkPlot developers ([adnan120hz/WorkSlop](https://github.com/adnan120hz/WorkSlop), [gievano/WorkPlot](https://github.com/gievano/WorkPlot))
 - **forcequitOS** ([forcequitOS/bad_query](https://github.com/forcequitOS/bad_query)) — bad_query sandbox escape
 - **Mak5er** ([Mak5er/AirCard-iOS](https://github.com/Mak5er/AirCard-iOS)) — AirCard on-device implementation
 - **Johnny Franks** ([0xjohnnydev](https://github.com/0xjohnnydev)) — AirLift exploit, FilzaSlop technique
