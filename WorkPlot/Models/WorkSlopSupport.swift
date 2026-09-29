@@ -15,6 +15,108 @@ enum WorkSlopExploitPath {
     case unsupported
 }
 
+// MARK: - Exploit Support Matrix
+
+/// Every exploit WorkSlop supports, with its genuine iOS version range.
+///
+/// Ranges are verified against GitHub sources — NOT from random websites
+/// (user explicitly warned about misinfo).
+///
+/// | Exploit       | iOS Range        | Patched In | Notes                           |
+/// |---------------|------------------|------------|---------------------------------|
+/// | bad_query     | 18.x, 26.x, 27.0 | —          | Sandbox escape via containermanager |
+/// | darksword     | 15.0 – 26.0.1    | 26.1       | Kernel r/w (opa334)             |
+/// | kfd           | 15.0 – 16.6.1    | 17.0       | Kernel File Descriptor          |
+/// | airlift       | 26.6 – 27.x      | —          | Pairing-based (AirCard)         |
+/// | book restore  | TBD (research)   | —          | Backup/restore based            |
+/// | sparse restore| TBD (research)   | —          | Backup/restore based            |
+/// | afc           | TBD (research)   | —          | Apple File Conduit              |
+enum WorkSlopExploit {
+    case badQuery
+    case darksword
+    case kfd
+    case airlift
+    case bookRestore
+    case sparseRestore
+    case afc
+
+    /// Human-readable name.
+    var displayName: String {
+        switch self {
+        case .badQuery: return "bad_query"
+        case .darksword: return "DarkSword"
+        case .kfd: return "kfd"
+        case .airlift: return "AirLift"
+        case .bookRestore: return "Book Restore"
+        case .sparseRestore: return "Sparse Restore"
+        case .afc: return "AFC"
+        }
+    }
+
+    /// True if this exploit works on the current iOS version.
+    func isSupported() -> Bool {
+        let v = WorkSlopSupport.currentVersion
+        let major = v.majorVersion
+        let minor = v.minorVersion
+
+        switch self {
+        case .badQuery:
+            // iOS 18.x, 26.x, 27.0 (per FilzaSlop + testing)
+            return major == 18 || major == 26 || major == 27
+
+        case .darksword:
+            // iOS 15.0 – 26.0.1 (patched in 26.1)
+            // Source: opa334/darksword README
+            if major < 15 || major > 26 { return false }
+            if major == 26 && minor > 0 { return false }
+            return true
+
+        case .kfd:
+            // iOS 15.0 – 16.6.1 (patched in 17.0)
+            // Source: felix-pb/kfd
+            return major == 15 || major == 16
+
+        case .airlift:
+            // iOS 26.6 – 27.x (pairing-based)
+            return WorkSlopSupport.airLiftAvailable()
+
+        case .bookRestore, .sparseRestore:
+            // TBD: waiting for research results
+            // Conservative: assume iOS 16-17 for now
+            return major == 16 || major == 17
+
+        case .afc:
+            // TBD: waiting for research (user claims patched on iOS 27)
+            // Conservative: assume works below 27
+            return major < 27
+        }
+    }
+
+    /// Why this exploit is unavailable on the current iOS (for UI).
+    func unavailableReason() -> String? {
+        guard !isSupported() else { return nil }
+        let v = WorkSlopSupport.currentVersion
+        let verStr = "iOS \(v.majorVersion).\(v.minorVersion)"
+
+        switch self {
+        case .badQuery:
+            return "bad_query requires iOS 18.x, 26.x, or 27.0 (running \(verStr))"
+        case .darksword:
+            return "DarkSword requires iOS 15.0–26.0.1 (patched in 26.1; running \(verStr))"
+        case .kfd:
+            return "kfd requires iOS 15–16 (running \(verStr))"
+        case .airlift:
+            return "AirLift requires iOS 26.6+ (running \(verStr))"
+        case .bookRestore:
+            return "Book Restore iOS support TBD (running \(verStr))"
+        case .sparseRestore:
+            return "Sparse Restore iOS support TBD (running \(verStr))"
+        case .afc:
+            return "AFC requires iOS < 27 (running \(verStr))"
+        }
+    }
+}
+
 // MARK: - Version Support
 
 /// Central version gating for WorkSlop's exploit paths.

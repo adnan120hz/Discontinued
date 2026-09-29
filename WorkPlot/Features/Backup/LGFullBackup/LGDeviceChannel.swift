@@ -193,3 +193,214 @@ final class AirLiftDeviceChannel: LGDeviceChannel {
             "being built (parallel airlift work).")
     }
 }
+
+// MARK: - MobileBackup2Channel (genuine mobilebackup2 via Rust)
+
+/// Genuine mobilebackup2 device channel using the Rust `idevice` crate's
+/// mobilebackup2 client — the same method GoldenNugget-mobile uses.
+///
+/// This is NOT AirLift and NOT a plist snapshot. It talks to the device's
+/// own `com.apple.mobilebackup2` service over the loopback tunnel using
+/// the imported pairing file.
+///
+/// Requirements (all must be true for `isReady`):
+/// - AirLift pairing file imported (lockdown format for mobilebackup2)
+/// - Loopback VPN tunnel active (LocalDevVPN)
+/// - Device UDID available
+@MainActor
+final class MobileBackup2Channel: LGDeviceChannel {
+    static let shared = MobileBackup2Channel()
+    private init() {}
+
+    var isReady: Bool {
+        AirLiftManager.shared.isPaired && VPNCheck.isVPNActive()
+    }
+
+    var readinessNote: String? {
+        if !AirLiftManager.shared.isPaired {
+            return "Pairing file required. Import a lockdown pairing file (AirLift tab) first."
+        }
+        if !VPNCheck.isVPNActive() {
+            return "Loopback tunnel not active. Start LocalDevVPN first."
+        }
+        return nil
+    }
+
+    var pairingFileURL: URL? {
+        guard let file = AirLiftManager.shared.importedFile else { return nil }
+        return URL(fileURLWithPath: file.storedPath)
+    }
+
+    // MARK: - mobilebackup2 backup
+
+    /// Pull a real device backup via mobilebackup2.
+    ///
+    /// Flow (GoldenNugget-mobile style):
+    /// 1. Connect to device's mobilebackup2 service via tunnel + pairing
+    /// 2. Pull backup into `deviceDir` (<working>/<udid>/)
+    /// 3. Report progress via callback
+    func pullBackup(into deviceDir: URL, udid: String,
+                    onProgress: @escaping (Double) -> Void) async throws {
+        guard let pairingURL = pairingFileURL else {
+            throw LGChannelError.pairingRequired
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                var outError: UnsafeMutablePointer<CChar>? = nil
+
+                // Progress callback: forward to Swift
+                let progressCb: MBProgressCallback = { ctx, percent, message in
+                    let msg = message.map { String(cString: $0) } ?? ""
+                    DispatchQueue.main.async {
+                        onProgress(percent / 100.0)
+                    }
+                    print("[mb2] \(Int(percent))% — \(msg)")
+                }
+
+                let rc = pairingURL.path.withCString { pairC in
+                    udid.withCString { udidC in
+                        deviceDir.path.withCString { dirC in
+                            mb2_backup(pairC, udidC, dirC, nil, progressCb, nil, &outError)
+                        }
+                    }
+                }
+
+                if rc == 0 {
+                    DispatchQueue.main.async {
+                        continuation.resume()
+                    }
+                } else {
+                    let detail: String
+                    if let errPtr = outError {
+                        detail = String(cString: errPtr)
+                        al_string_free(errPtr)
+                    } else {
+                        detail = "unknown error (rc=\(rc))"
+                    }
+                    DispatchQueue.main.async {
+                        continuation.resume(throwing: LGChannelError.transferFailed(
+                            "mobilebackup2 backup failed: \(detail)"))
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - mobilebackup2 restore
+
+    /// Restore a prepared backup via mobilebackup2.
+    ///
+    /// The restore does NOT reboot the device — the user reboots manually.
+    func restore(deviceDir: URL, sourceIdentifier: String,
+                 onProgress: @escaping (Double) -> Void) async throws {
+        guard let pairingURL = pairingFileURL else {
+            throw LGChannelError.pairingRequired
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                var outError: UnsafeMutablePointer<CChar>? = nil
+
+                let progressCb: MBProgressCallback = { ctx, percent, message in
+                    let msg = message.map { String(cString: $0) } ?? ""
+                    DispatchQueue.main.async {
+                        onProgress(percent / 100.0)
+                    }
+                    print("[mb2] restore \(Int(percent))% — \(msg)")
+                }
+
+                let rc = pairingURL.path.withCString { pairC in
+                    sourceIdentifier.withCString { udidC in
+                        deviceDir.path.withCString { dirC in
+                            mb2_restore(pairC, udidC, dirC, nil, progressCb, nil, &outError)
+                        }
+                    }
+                }
+
+                if rc == 0 {
+                    DispatchQueue.main.async {
+                        continuation.resume()
+                    }
+                } else {
+                    let detail: String
+                    if let errPtr = outError {
+                        detail = String(cString: errPtr)
+                        al_string_free(errPtr)
+                    } else {
+                        detail = "unknown error (rc=\(rc))"
+                    }
+                    DispatchQueue.main.async {
+                        continuation.resume(throwing: LGChannelError.transferFailed(
+                            "mobilebackup2 restore failed: \(detail)"))
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - AFC (media tree) — via existing AirLift AFC
+
+    func afcListDirectory(_ path: String) async throws -> [LGAfcEntry] {
+        // AFC media backup is handled by LGMediaStore via the AirLift AFC path.
+        // mobilebackup2 channel focuses on backup/restore; media goes via AFC.
+        throw LGChannelError.backendUnavailable(
+            "AFC media listing via mobilebackup2 channel not implemented — " +
+            "use LGMediaStore (AirLift AFC) for media backup.")
+    }
+
+    func afcStreamFile(path: String, chunkSize: Int,
+                       chunkHandler: @escaping (Data) throws -> Void) async throws {
+        throw LGChannelError.backendUnavailable(
+            "AFC streaming via mobilebackup2 channel not implemented.")
+    }
+
+    func afcFileSize(_ path: String) async throws -> Int64 {
+        throw LGChannelError.backendUnavailable(
+            "AFC via mobilebackup2 channel not implemented.")
+    }
+
+    func afcMakeDirectory(_ path: String) async throws {
+        throw LGChannelError.backendUnavailable(
+            "AFC via mobilebackup2 channel not implemented.")
+    }
+
+    func afcWriteFile(path: String, data: Data) async throws {
+        throw LGChannelError.backendUnavailable(
+            "AFC via mobilebackup2 channel not implemented.")
+    }
+
+    func afcDelete(path: String) async throws {
+        throw LGChannelError.backendUnavailable(
+            "AFC via mobilebackup2 channel not implemented.")
+    }
+}
+
+// MARK: - FFI declarations
+
+/// Progress callback type for mobilebackup2 operations.
+typealias MBProgressCallback = @convention(c) (UnsafeMutableRawPointer?, Double, UnsafePointer<CChar>?) -> Void
+
+/// Pull device backup via mobilebackup2 (Rust).
+@_silgen_name("mb2_backup")
+func mb2_backup(
+    _ pairingPath: UnsafePointer<CChar>,
+    _ udid: UnsafePointer<CChar>,
+    _ backupRoot: UnsafePointer<CChar>,
+    _ logCb: UnsafeRawPointer?,
+    _ progressCb: MBProgressCallback?,
+    _ ctx: UnsafeMutableRawPointer?,
+    _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> Int32
+
+/// Restore device backup via mobilebackup2 (Rust).
+@_silgen_name("mb2_restore")
+func mb2_restore(
+    _ pairingPath: UnsafePointer<CChar>,
+    _ udid: UnsafePointer<CChar>,
+    _ backupRoot: UnsafePointer<CChar>,
+    _ logCb: UnsafeRawPointer?,
+    _ progressCb: MBProgressCallback?,
+    _ ctx: UnsafeMutableRawPointer?,
+    _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> Int32

@@ -66,8 +66,9 @@ final class LGBackupEngine {
     static let shared = LGBackupEngine()
     private init() {}
 
-    /// Swappable for tests or for the genuine channel once it lands.
-    var channel: LGDeviceChannel = AirLiftDeviceChannel.shared
+    /// Genuine mobilebackup2 channel — the real GoldenNugget-mobile method.
+    /// NOT AirLift, NOT a plist snapshot.
+    var channel: LGDeviceChannel = MobileBackup2Channel.shared
 
     var isChannelReady: Bool { channel.isReady }
     var channelReadinessNote: String? { channel.readinessNote }
