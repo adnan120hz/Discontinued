@@ -387,7 +387,7 @@ struct HomeView: View {
             Spacer(minLength: 6)
             Image(systemName: !supported ? "lock.fill" : "chevron.right")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(!supported ? Color.gray : .tertiary)
+                .foregroundStyle(!supported ? Color.gray : Color(uiColor: .tertiaryLabel))
         }
         .padding(.vertical, 9)
         .contentShape(Rectangle())
