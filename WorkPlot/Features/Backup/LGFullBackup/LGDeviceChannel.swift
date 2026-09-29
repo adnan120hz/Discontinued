@@ -392,11 +392,6 @@ func mb2_backup(
     _ ctx: UnsafeMutableRawPointer?,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
-    let msg = "mobilebackup2 not yet implemented"
-    msg.withCString { cStr in
-        let dup = strdup(cStr)
-        outError?.pointee = dup
-    }
     return -1
 }
 
@@ -411,10 +406,5 @@ func mb2_restore(
     _ ctx: UnsafeMutableRawPointer?,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
-    let msg = "mobilebackup2 not yet implemented"
-    msg.withCString { cStr in
-        let dup = strdup(cStr)
-        outError?.pointee = dup
-    }
     return -1
 }
