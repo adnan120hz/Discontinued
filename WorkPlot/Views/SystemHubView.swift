@@ -49,7 +49,7 @@ struct SystemHubView: View {
                 Text("WorkSlop")
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.white)
-                Text("Gestalt toolkit  v\(version)")
+                Text("Add Fitur di hp yang ga support! version beta 1")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.85))
             }
