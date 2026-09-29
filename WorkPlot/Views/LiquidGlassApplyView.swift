@@ -26,7 +26,7 @@ struct LiquidGlassApplyView: View {
         store.tweaks.filter { $0.category == .liquidGlass }
     }
 
-    private var isIOS27Flow: Bool { model.flow == .fullBackup }
+    private var isIOS27Flow: Bool { false } // fullBackup removed; partial-restore only
     private var backupMissing: Bool {
         isIOS27Flow && model.backupInfo == nil && model.backupMode != .fullDevice
     }
@@ -382,13 +382,13 @@ struct LiquidGlassApplyView: View {
 
     private var statusRow: some View {
         HStack(spacing: 12) {
-            Image(systemName: model.flow == .fullBackup ? "externaldrive.fill" : "arrow.triangle.2.circlepath")
+            Image(systemName: false ? "externaldrive.fill" : "arrow.triangle.2.circlepath")
                 .font(.title3)
                 .foregroundStyle(.white)
                 .frame(width: 40, height: 40)
                 .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
-                Text(model.flow == .fullBackup ? "Full backup flow (iOS 27)"
+                Text(false ? "Full backup flow (iOS 27)"
                      : model.flow == .partialRestore ? "Partial-restore flow (iOS 26)"
                      : "Unsupported iOS version")
                     .font(.subheadline.weight(.semibold))
@@ -402,7 +402,7 @@ struct LiquidGlassApplyView: View {
 
     private var backupStatusText: String {
         switch model.flow {
-        case .fullBackup:
+        // .fullBackup removed:
             if model.backupMode == .fullDevice {
                 return "Full device backup ready — Apply will inject and restore."
             }
@@ -429,10 +429,10 @@ struct LiquidGlassApplyView: View {
         ActionButton(title: "Backup",
                      systemImage: "externaldrive.fill",
                      isBusy: model.busyTask == .backingUp,
-                     disabled: model.flow != .fullBackup) {
+                     disabled: true) {
             model.createBackup()
         }
-        .opacity(model.flow == .fullBackup ? 1 : 0.45)
+        .opacity(false ? 1 : 0.45)
     }
 
     /// Blue on both flows. On iOS 27 it stays disabled until the full
@@ -459,7 +459,7 @@ struct LiquidGlassApplyView: View {
 
     private var restoreTitle: String {
         switch model.flow {
-        case .fullBackup:
+        // .fullBackup removed:
             return model.backupMode == .fullDevice ? "Restore pristine files" : "Restore full backup"
         case .partialRestore:
             return "Undo last apply"
@@ -470,7 +470,7 @@ struct LiquidGlassApplyView: View {
 
     private var restoreHint: String {
         switch model.flow {
-        case .fullBackup:
+        // .fullBackup removed:
             return model.backupMode == .fullDevice
                 ? "Restore the pristine liquid-glass files stashed at backup time"
                 : "Restore the pristine liquid-glass backup"
@@ -483,7 +483,7 @@ struct LiquidGlassApplyView: View {
 
     private var restoreDisabled: Bool {
         switch model.flow {
-        case .fullBackup:
+        // .fullBackup removed:
             return model.backupInfo == nil && model.backupMode != .fullDevice
         case .partialRestore: return !model.canUndoPartial
         case .unsupported: return true

@@ -120,6 +120,7 @@ func themeWritePairs(from entries: [ZipEntry]) -> [(String, Data)] {
 /// geod lease (FilzaSlop route).
 /// first Apply so the theme can be restored.
 struct DialerThemeView: View {
+    @ObservedObject private var manager = AirLiftManager.shared
     @State private var showPicker = false
     @State private var zipName: String?
     @State private var entries: [ZipEntry] = []
@@ -141,8 +142,8 @@ struct DialerThemeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                SectionHeader("Dialer Theme (iOS 26.6–26.7, bad_query)")
-                if !isSupportedOS {
+                SectionHeader("Dialer Theme (AirLift)")
+                if !manager.isPaired {
                     notSupportedCard
                 }
                 importCard
@@ -173,7 +174,7 @@ struct DialerThemeView: View {
     // MARK: Cards
 
     private var notSupportedCard: some View {
-        Text("Dialer theming via bad_query is intended for iOS 26.6–26.7. \(WorkSlopSupport.deviceLabel()). You can still inspect a zip, but Apply is disabled.")
+        Text("AirLift pairing required. Pair in the AirLift tab first, then apply dialer themes.")
             .font(.footnote)
             .foregroundStyle(Theme.caution)
             .padding(18)
@@ -306,46 +307,45 @@ struct DialerThemeView: View {
     }
 
     private func apply() {
-        guard isSupportedOS, !files.isEmpty else { return }
+        guard manager.isPaired, !files.isEmpty else {
+            status = "AirLift pairing required. Pair in the AirLift tab first."
+            return
+        }
         isApplying = true
         status = nil
-        // Off the main thread; bad_query is synchronous file I/O.
+        // Off the main thread; AirLiftFileWriter is synchronous file I/O.
+        // Per AirCard-iOS: dialer PNGs go to TelephonyUI-10 via AirTraffic
+        // over the loopback tunnel. Skip __MACOSX/ metadata and strip a
+        // single top-level theme folder.
         DispatchQueue.global(qos: .userInitiated).async {
-            // Per AirCard-iOS: dialer PNGs go to TelephonyUI-10. Skip
-            // __MACOSX/ metadata and strip a single top-level theme folder.
-            // Writes go through the bad_query class-12 geod lease
-            // (FilzaSlop route) — explicit bad_query, never AirLift.
             let pairs = themeWritePairs(from: files)
-            let message: String
-            do {
-                var failures: [String] = []
-                try BadQueryLeaseScope.withLibraryCachesLease {
-                    let fm = FileManager.default
-                    for (relPath, data) in pairs {
-                        let dest = (Self.dialerThemeDestinationPath as NSString)
-                            .appendingPathComponent(relPath)
-                        do {
-                            // Ensure the parent directory exists inside the lease.
-                            let parent = (dest as NSString).deletingLastPathComponent
-                            try fm.createDirectory(atPath: parent,
-                                                   withIntermediateDirectories: true)
-                            try data.write(to: URL(fileURLWithPath: dest),
-                                           options: .atomic)
-                        } catch {
-                            // Surface the daemon's reason when available.
-                            let detail = BadQuery.lastErrorDetail.map { " (\($0))" } ?? ""
-                            failures.append("\(relPath): \(error.localizedDescription)\(detail)")
-                        }
-                    }
-                }
-                if failures.isEmpty {
-                    message = "Applied \(pairs.count) files. Respring to take effect."
+            var failures: [String] = []
+            var byDirectory: [String: [(name: String, data: Data)]] = [:]
+            for (relPath, data) in pairs {
+                let parent = ((relPath as NSString).deletingLastPathComponent as NSString)
+                    .standardizingPath
+                let leaf = (relPath as NSString).lastPathComponent
+                byDirectory[parent, default: []].append((name: leaf, data: data))
+            }
+            for (parent, group) in byDirectory {
+                let destDir: String
+                if parent.isEmpty || parent == "." {
+                    destDir = Self.dialerThemeDestinationPath
                 } else {
-                    message = "Failed: \(failures.count) of \(pairs.count) writes failed. First: \(failures[0])"
+                    destDir = (Self.dialerThemeDestinationPath as NSString)
+                        .appendingPathComponent(parent)
                 }
-            } catch {
-                let detail = BadQuery.lastErrorDetail.map { " (\($0))" } ?? ""
-                message = "Failed: \(error.localizedDescription)\(detail)"
+                do {
+                    try AirLiftFileWriter.writeFiles(group, toDirectory: destDir)
+                } catch {
+                    failures.append("\(parent.isEmpty ? "root" : parent): \(error.localizedDescription)")
+                }
+            }
+            let message: String
+            if failures.isEmpty {
+                message = "Applied \(pairs.count) files in \(byDirectory.count) sync sessions. Respring to take effect."
+            } else {
+                message = "Failed: \(failures.count) of \(byDirectory.count) directories failed. First: \(failures[0])"
             }
             DispatchQueue.main.async {
                 status = message

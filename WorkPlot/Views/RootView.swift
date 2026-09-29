@@ -66,10 +66,6 @@ struct MainTabView: View {
             }
             .tabItem { Label("AirLift", systemImage: "cable.connector") }
             NavigationStack {
-                AppDataView()
-            }
-            .tabItem { Label("App Data", systemImage: "folder") }
-            NavigationStack {
                 OtherExploitView()
             }
             .tabItem { Label("Other Exploit", systemImage: "hammer") }

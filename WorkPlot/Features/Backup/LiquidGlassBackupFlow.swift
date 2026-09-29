@@ -6,28 +6,22 @@ import SwiftUI
 /// Which Liquid Glass tweaks apply route WorkSlop uses, picked from the
 /// running iOS version via `WorkSlopSupport.isIOS27()` / `isIOS26()`.
 enum LiquidGlassFlow {
-    /// iOS 27: full backup → modify → full restore (GoldenNugget-style).
-    case fullBackup
-    /// iOS 26: partial-restore (bookrestore-style) — no Backup step.
+    /// iOS 26.2+: partial-restore — no Backup step, no mobilebackup2.
     case partialRestore
     case unsupported
 
     static var current: LiquidGlassFlow {
-        if WorkSlopSupport.isIOS27() { return .fullBackup }
         if WorkSlopSupport.isIOS26() { return .partialRestore }
         return .unsupported
     }
 
-    /// The note shown directly under the Apply button. The iOS 27 string
-    /// is spec'd verbatim — do not reword it.
+    /// The note shown directly under the Apply button.
     var applyNote: String {
         switch self {
-        case .fullBackup:
-            return "For iOS 27 you must press Backup first"
         case .partialRestore:
-            return "On iOS 26 the partial-restore flow applies directly — no backup step needed."
+            return "On iOS 26.2+ the partial-restore flow applies directly — no backup step needed."
         case .unsupported:
-            return "The backup-safe liquid-glass flow needs iOS 26 or 27."
+            return "Liquid Glass tweaks need iOS 26.2+."
         }
     }
 }
