@@ -25,6 +25,7 @@ struct HomeView: View {
     private var consoleCategories: [TweakCategory] {
         TweakCategory.allCases.filter { cat in
             cat != .ai &&
+            cat != .liquidGlass && // Liquid Glass has its own menu/tab
             (store.tweaks.contains { $0.category == cat } || toolDefs.contains { $0.category == cat })
         }
     }
@@ -257,7 +258,7 @@ struct HomeView: View {
                 SectionHeader(category.rawValue, detail: "\(cells.count) available")
                 cellList(cells)
             } else {
-                let tweaks = store.tweaks.filter { $0.category != .ai && matchesSearch($0.title) }
+                let tweaks = store.tweaks.filter { $0.category != .ai && $0.category != .liquidGlass && matchesSearch($0.title) }
                 let tools = toolDefs.filter { $0.id != "respring" && matchesSearch($0.title) }
                 // Interleave tweaks and tools. (A `while` loop can't be used
                 // here: result builders don't allow control-flow statements.)
