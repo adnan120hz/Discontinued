@@ -22,15 +22,15 @@ enum WorkSlopExploitPath {
 /// Ranges are verified against GitHub sources — NOT from random websites
 /// (user explicitly warned about misinfo).
 ///
-/// | Exploit       | iOS Range        | Patched In | Notes                           |
-/// |---------------|------------------|------------|---------------------------------|
-/// | bad_query     | 18.x, 26.x, 27.0 | —          | Sandbox escape via containermanager |
-/// | darksword     | 15.0 – 26.0.1    | 26.1       | Kernel r/w (opa334/darksword)   |
-/// | kfd           | 15.0 – 16.6.1    | 17.0       | Kernel File Descriptor          |
-/// | airlift       | 26.6 – 27.x      | —          | Pairing-based (AirCard)         |
-/// | book restore  | 17.x             | TBD        | Backup/restore based            |
-/// | sparse restore| 17.x (CVE-2024-44252) | 17.1+? | Backup/restore via CVE-2024-44252 |
-/// | afc           | < 27             | 27?        | Apple File Conduit (user claims patched on 27) |
+/// | Exploit       | iOS Range              | Patched In | Notes                     |
+/// |---------------|------------------------|------------|---------------------------|
+/// | bad_query     | 26.0–26.6.1, 27.0b1–b5 | —          | Sandbox escape (18.x untested) |
+/// | darksword     | 17.0–18.7.1, 26.0–26.0.1 | 18.7.2/26.1 | Kernel r/w (tool offsets) |
+/// | kfd           | 15.0 – 16.6.1          | 17.0       | Kernel File Descriptor    |
+/// | airlift       | 27.0 only              | —          | Pairing-based (NOT 26.6)  |
+/// | book restore  | 18.2 – 26.1            | 26.2b2     | Books daemon escape (NOT backup) |
+/// | sparse restore| 15.2–17.7, 18.0–18.1b4 | 17.7.1/18.1| CVE-2024-44252 (backup-based) |
+/// | afc           | All (Media-scoped)     | —          | NOT patched on 27 (user claim false) |
 enum WorkSlopExploit {
     case badQuery
     case darksword
@@ -58,27 +58,35 @@ enum WorkSlopExploit {
         let v = WorkSlopSupport.currentVersion
         let major = v.majorVersion
         let minor = v.minorVersion
+        let patch = v.patchVersion
 
         switch self {
         case .badQuery:
-            // iOS 18.x, 26.x, 27.0 (per FilzaSlop + testing)
-            return major == 18 || major == 26 || major == 27
+            // iOS 26.0–26.6.1, 27.0 beta 1–5 (forcequitOS/bad_query)
+            // iOS 18 explicitly untested by author — not claimed.
+            if major == 26 {
+                // 26.0 to 26.6.1
+                if minor < 6 { return true }
+                if minor == 6 && patch <= 1 { return true }
+                return false
+            }
+            if major == 27 {
+                // Beta 1-5 only (per author: "works on 27.0b5")
+                // Without build info, assume supported on 27.0
+                return minor == 0
+            }
+            return false
 
         case .darksword:
-            // Tool-usable range (offsets available): 17.0–18.7.1 and 26.0–26.0.1
-            // Vulnerability spans 15.0–26.0.1 but no tool offsets for 15.x–16.x.
-            // Patched in 18.7.2 / 26.1 (CVE-2025-43510, CVE-2025-43520).
-            // Does NOT work on A19/M5 (MTE).
-            // Sources: opa334/darksword, rooootdev/lara, Google TAG
+            // Tool-usable range (offsets): 17.0–18.7.1 and 26.0–26.0.1
+            // (see dedicated case above)
             let v = WorkSlopSupport.currentVersion
             let major = v.majorVersion
             let minor = v.minorVersion
             let patch = v.patchVersion
-            // iOS 26.0–26.0.1 only
             if major == 26 {
                 return minor == 0 && patch <= 1
             }
-            // iOS 17.0–18.7.1
             if major == 17 { return true }
             if major == 18 {
                 if minor < 7 { return true }
@@ -88,23 +96,47 @@ enum WorkSlopExploit {
             return false
 
         case .kfd:
-            // iOS 15.0 – 16.6.1 (patched in 17.0)
-            // Source: felix-pb/kfd
+            // iOS 15.0 – 16.6.1 (patched in 17.0, CVE-2023-41974)
             return major == 15 || major == 16
 
         case .airlift:
-            // iOS 26.6 – 27.x (pairing-based)
-            return WorkSlopSupport.airLiftAvailable()
+            // iOS 27.0 ONLY (0xjohnnydev/airlift)
+            // CORRECTION: prior "26.6 → 27.0" was WorkSlop-side invention.
+            // Upstream AirLift is 27.0-only (tested 27.0 RC 24A435).
+            return major == 27 && minor == 0
 
-        case .bookRestore, .sparseRestore:
-            // TBD: waiting for research results
-            // Conservative: assume iOS 16-17 for now
-            return major == 16 || major == 17
+        case .bookRestore:
+            // iOS 18.2 – 26.1 (patched in 26.2b2, CVE-2025-46286)
+            // NOT backup/restore based — Books daemon sandbox escape.
+            if major < 18 || major > 26 { return false }
+            if major == 18 { return minor >= 2 }
+            if major == 26 { return minor < 2 } // 26.0-26.1 (26.2+ patched)
+            return true // 19-25 (theoretical, untested)
+
+        case .sparseRestore:
+            // Full: 15.2–17.7, 18.0–18.1b4 (CVE-2024-44252)
+            // Partial (domains only): 17.7.1, 18.1b5–18.2b2
+            // Dead: 18.2b3+
+            if major < 15 || major > 18 { return false }
+            if major == 15 { return minor >= 2 }
+            if major == 16 { return true }
+            if major == 17 {
+                if minor < 7 { return true }
+                if minor == 7 { return patch == 0 } // 17.7 full, 17.7.1 partial
+                return false
+            }
+            if major == 18 {
+                if minor == 0 { return true } // 18.0-18.0.1
+                if minor == 1 { return patch == 0 } // 18.1b1-b4 only (can't detect beta)
+                return false // 18.2+ dead
+            }
+            return false
 
         case .afc:
-            // TBD: waiting for research (user claims patched on iOS 27)
-            // Conservative: assume works below 27
-            return major < 27
+            // AFC works on ALL iOS (Media-scoped by design).
+            // User claim "patched on iOS 27" is FALSE.
+            // airlift (tested on 27.0 RC) uses AFC as its read path.
+            return true
         }
     }
 
@@ -116,19 +148,19 @@ enum WorkSlopExploit {
 
         switch self {
         case .badQuery:
-            return "bad_query requires iOS 18.x, 26.x, or 27.0 (running \(verStr))"
+            return "bad_query requires iOS 26.0–26.6.1 or 27.0 beta 1–5 (running \(verStr))"
         case .darksword:
             return "DarkSword requires iOS 17.0–18.7.1 or 26.0–26.0.1 (tool offsets; patched in 18.7.2/26.1; running \(verStr))"
         case .kfd:
-            return "kfd requires iOS 15–16 (running \(verStr))"
+            return "kfd requires iOS 15.0–16.6.1 (patched in 17.0; running \(verStr))"
         case .airlift:
-            return "AirLift requires iOS 26.6+ (running \(verStr))"
+            return "AirLift requires iOS 27.0 only (running \(verStr))"
         case .bookRestore:
-            return "Book Restore iOS support TBD (running \(verStr))"
+            return "Book Restore requires iOS 18.2–26.1 (patched in 26.2b2; running \(verStr))"
         case .sparseRestore:
-            return "Sparse Restore iOS support TBD (running \(verStr))"
+            return "Sparse Restore requires iOS 15.2–17.7 or 18.0–18.1b4 (patched in 17.7.1/18.1; running \(verStr))"
         case .afc:
-            return "AFC requires iOS < 27 (running \(verStr))"
+            return nil // AFC works on all iOS
         }
     }
 }
