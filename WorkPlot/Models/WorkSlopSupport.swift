@@ -65,11 +65,27 @@ enum WorkSlopExploit {
             return major == 18 || major == 26 || major == 27
 
         case .darksword:
-            // iOS 15.0 – 26.0.1 (patched in 26.1)
-            // Source: opa334/darksword README
-            if major < 15 || major > 26 { return false }
-            if major == 26 && minor > 0 { return false }
-            return true
+            // Tool-usable range (offsets available): 17.0–18.7.1 and 26.0–26.0.1
+            // Vulnerability spans 15.0–26.0.1 but no tool offsets for 15.x–16.x.
+            // Patched in 18.7.2 / 26.1 (CVE-2025-43510, CVE-2025-43520).
+            // Does NOT work on A19/M5 (MTE).
+            // Sources: opa334/darksword, rooootdev/lara, Google TAG
+            let v = WorkSlopSupport.currentVersion
+            let major = v.majorVersion
+            let minor = v.minorVersion
+            let patch = v.patchVersion
+            // iOS 26.0–26.0.1 only
+            if major == 26 {
+                return minor == 0 && patch <= 1
+            }
+            // iOS 17.0–18.7.1
+            if major == 17 { return true }
+            if major == 18 {
+                if minor < 7 { return true }
+                if minor == 7 { return patch <= 1 }
+                return false
+            }
+            return false
 
         case .kfd:
             // iOS 15.0 – 16.6.1 (patched in 17.0)
@@ -102,7 +118,7 @@ enum WorkSlopExploit {
         case .badQuery:
             return "bad_query requires iOS 18.x, 26.x, or 27.0 (running \(verStr))"
         case .darksword:
-            return "DarkSword requires iOS 15.0–26.0.1 (patched in 26.1; running \(verStr))"
+            return "DarkSword requires iOS 17.0–18.7.1 or 26.0–26.0.1 (tool offsets; patched in 18.7.2/26.1; running \(verStr))"
         case .kfd:
             return "kfd requires iOS 15–16 (running \(verStr))"
         case .airlift:
