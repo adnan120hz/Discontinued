@@ -82,11 +82,13 @@ private struct NumberedStep: View {
 ///
 /// - iOS 27+: the phone pairs with ITSELF. WorkSlop runs an RPPairing host,
 ///   advertises it over Bonjour, and shows a PIN. The user confirms the PIN
-///   in Settings → Privacy & Security → Developer Mode. Writes then go
-///   through the genuine on-device AirLift exploit (no Mac involved).
+///   in Settings → Privacy & Security → Developer Mode.
 /// - iOS 26.6–26.7: manual pairing-file import (file generated on a PC via
-///   iDevicePairing / iLoader). Writes on iOS 26.x go through the bad_query
-///   fallback — that path is NOT AirLift and the UI says so.
+///   iDevicePairing / iLoader, or exported from SideStore / AltStore).
+///   Supported formats: `.plist` and `.mobiledevicepairing`.
+///
+/// On both iOS 26 and 27, writes go through the genuine on-device AirLift
+/// exploit (no Mac involved, no bad_query fallback).
 struct AirLiftPairingView: View {
     @ObservedObject private var manager = AirLiftManager.shared
     @State private var showPicker = false
@@ -121,7 +123,11 @@ struct AirLiftPairingView: View {
         .onAppear(perform: refreshTunnel)
         .sheet(isPresented: $showPicker) {
             AirLiftDocumentPicker(
-                allowedTypes: [.data],
+                allowedTypes: [
+                    .propertyList,
+                    UTType(filenameExtension: "mobiledevicepairing") ?? .data,
+                    UTType(filenameExtension: "mobilepair") ?? .data,
+                ],
                 onPick: { url in
                     manager.importPairingFile(from: url)
                     showPicker = false
@@ -278,19 +284,19 @@ struct AirLiftPairingView: View {
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: iOS 26.x — manual file import (bad_query fallback, NOT AirLift)
+    // MARK: iOS 26.x — manual file import
 
     private var fileFlowCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader("Pairing File Import")
-            Text("On iOS 26.x the on-device AirLift exploit is unavailable. Importing a pairing file unlocks the bad_query fallback writes — that path is not AirLift and is never labeled as such.")
+            Text("Import a pairing file to unlock the genuine on-device AirLift exploit on iOS 26.x. Supported formats: .plist and .mobiledevicepairing (lockdown pairing records from iDevicePairing, iLoader, SideStore, AltStore, or iTunes).")
                 .font(.footnote)
-                .foregroundStyle(Theme.caution)
+                .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 12) {
                 NumberedStep(number: 1, text: "On your PC or Mac, use iLoader or iDevicePairing to generate a pairing file for this iPhone.")
                 NumberedStep(number: 2, text: "Transfer the pairing file to this iPhone — for example with AirDrop, an email to yourself, or the Files app.")
-                NumberedStep(number: 3, text: "Tap Import Pairing File below and choose the transferred file.")
-                NumberedStep(number: 4, text: "Once imported, fallback writes are unlocked on this iPhone.")
+                NumberedStep(number: 3, text: "Tap Import Pairing File below and choose the transferred file (.plist or .mobiledevicepairing).")
+                NumberedStep(number: 4, text: "Once imported, AirLift writes are unlocked on this iPhone.")
             }
             if let file = manager.importedFile {
                 HStack {

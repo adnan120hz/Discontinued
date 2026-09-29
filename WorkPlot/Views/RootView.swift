@@ -69,6 +69,10 @@ struct MainTabView: View {
                 AppDataView()
             }
             .tabItem { Label("App Data", systemImage: "folder") }
+            NavigationStack {
+                OtherExploitView()
+            }
+            .tabItem { Label("Other Exploit", systemImage: "hammer") }
             SystemHubView()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
         }

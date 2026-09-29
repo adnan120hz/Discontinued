@@ -32,4 +32,20 @@ enum BadQueryLeaseScope {
         defer { handle.release() }
         return try body()
     }
+
+    /// Short-lived lease for `/var/mobile/Library/Caches` via the class-12
+    /// geod route. The dialer-theme backend (iOS 26) — explicit, never AirLift.
+    static func withLibraryCachesLease<T>(_ body: () throws -> T) throws -> T {
+        let handle = try BadQuery.consumeLibraryCaches()
+        defer { handle.release() }
+        return try body()
+    }
+
+    /// Short-lived lease for an app's data container via the class-2 route
+    /// with the app's real bundle identifier. The App Data backend.
+    static func withAppContainerLease<T>(bundleId: String, _ body: () throws -> T) throws -> T {
+        let handle = try BadQuery.consumeAppContainer(bundleId: bundleId)
+        defer { handle.release() }
+        return try body()
+    }
 }

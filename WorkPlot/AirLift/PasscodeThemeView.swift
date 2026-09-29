@@ -4,17 +4,12 @@ import UniformTypeIdentifiers
 // MARK: - PasscodeThemeView
 
 /// "Passcode Theme (AirLift)": import a mandatory `.passthm` theme file and
-/// apply it via `AirLiftFileWriter`.
+/// apply it via `AirLiftFileWriter` (genuine on-device AirLift on iOS 26.x
+/// and 27.x — no bad_query fallback).
 ///
-/// Gated on BOTH conditions:
-/// 1. `AirLiftManager` is paired (in-app RPPairing host flow on iOS 27 /
-///    pairing-file import on iOS 26).
-/// 2. `VPNCheck.requireVPN()` passes — the passcode-theme flow writes through
-///    a local developer VPN tunnel. When no `utun*` interface is up, the UI
-///    blocks with an explanatory message instead of failing silently.
-///
-/// On iOS 26.x, writes go through the bad_query fallback in
-/// `AirLiftFileWriter` — never presented as AirLift.
+/// Gated on pairing: `AirLiftManager` must be paired (in-app RPPairing host
+/// flow on iOS 27 / pairing-file import on iOS 26). A missing local dev VPN
+/// is a warning, not a blocker — the exploit tries 127.0.0.1:49152 first.
 struct PasscodeThemeView: View {
     @ObservedObject private var manager = AirLiftManager.shared
     @State private var showPicker = false
@@ -37,26 +32,22 @@ struct PasscodeThemeView: View {
     /// `__MACOSX/` metadata entries are skipped.
     static let passcodeThemeDestinationPath = "/var/mobile/Library/Caches/TelephonyUI-10"
 
-    /// Gate state evaluated live for the UI.
+    /// Gate state evaluated live for the UI. Pairing is required; a missing
+    /// VPN is surfaced as a warning, not a blocker.
     private var gate: PasscodeGate {
         if !manager.isPaired { return .notPaired }
-        do {
-            try VPNCheck.requireVPN()
-            return .open
-        } catch {
-            return .noVPN(error.localizedDescription)
+        if !VPNCheck.isVPNActive() {
+            return .noVPN("No local dev VPN detected. The exploit tries 127.0.0.1:49152 first and may still succeed — this is a warning, not a blocker.")
         }
+        return .open
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 SectionHeader("Passcode Theme (AirLift)")
-                if !WorkSlopSupport.isIOS27() {
-                    fallbackNoticeCard
-                }
                 gateCard
-                if gate == .open {
+                if gate != .notPaired {
                     pickerCard
                     if themeData != nil { applyCard }
                 }
@@ -81,23 +72,6 @@ struct PasscodeThemeView: View {
     }
 
     // MARK: Gate
-
-    /// Honest fallback notice: on iOS 26.x the on-device AirLift exploit is
-    /// unavailable, so writes go through the bad_query fallback — never
-    /// labeled as AirLift.
-    private var fallbackNoticeCard: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(Theme.caution)
-                .font(.title2)
-            Text("iOS 26.x fallback: the AirLift exploit needs iOS 27+. On this device, writes go through the bad_query fallback instead — not AirLift.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .padding(18)
-        .background(Color(uiColor: .tertiarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
 
     private enum PasscodeGate: Equatable {
         case open
@@ -130,11 +104,21 @@ struct PasscodeThemeView: View {
                 body: "AirLift is not paired. Go to AirLift Pairing first — pair this iPhone with itself (iOS 27) or import your pairing file (iOS 26.6–26.7) — then come back."
             )
         case .noVPN(let detail):
-            blockingCard(
-                icon: "network.slash",
-                title: "Local dev VPN required — blocked",
-                body: detail + " The passcode-theme flow is blocked until a dev VPN tunnel is up; nothing will be written."
-            )
+            // Warning, not a blocker: the exploit tries 127.0.0.1 first.
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Theme.caution)
+                        .font(.title2)
+                    Text("No local dev VPN — may still work").font(.headline)
+                }
+                Text(detail)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(18)
+            .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 
@@ -207,7 +191,7 @@ struct PasscodeThemeView: View {
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("Info")
-            Text("The theme MUST be a .passthm file — other extensions are rejected with an explanation. The VPN gate is enforced with VPNCheck.requireVPN() (utun interface detection, no entitlements needed) and the flow blocks with an explanation when no local dev VPN is active. The .passthm is extracted on-device and its assets are written to /var/mobile/Library/Caches/TelephonyUI-10 (per AirCard-iOS).")
+            Text("The theme MUST be a .passthm file — other extensions are rejected with an explanation. Writes go through the genuine on-device AirLift exploit (iOS 26.x and 27.x): the phone talks to itself over a loopback tunnel. A missing local dev VPN is a warning, not a blocker — the exploit tries 127.0.0.1:49152 first. The .passthm is extracted on-device and its assets are written to /var/mobile/Library/Caches/TelephonyUI-10 (per AirCard-iOS).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -249,10 +233,10 @@ struct PasscodeThemeView: View {
     }
 
     private func apply() {
-        // Re-check the gate at apply time — the VPN can drop between
-        // rendering and tapping.
-        guard gate == .open else {
-            status = "Failed: gate no longer open. Re-check pairing and VPN."
+        // Re-check pairing at apply time — it can be revoked between
+        // rendering and tapping. VPN is a warning, not a blocker.
+        guard manager.isPaired else {
+            status = "Failed: not paired. Pair in AirLift Pairing first."
             return
         }
         guard let data = themeData, let name = themeName else { return }

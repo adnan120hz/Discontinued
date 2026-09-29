@@ -30,6 +30,7 @@ struct SettingsView: View {
                 appearance
                 connection
                 backup
+                diagnostics
                 supportInfo
             }
             .padding(Theme.pagePadding)
@@ -282,6 +283,46 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Diagnostics
+
+    private var diagnostics: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader("Diagnostics")
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) {
+                    iconTile("stethoscope")
+                    Text("bad_query last error")
+                        .font(.subheadline.weight(.semibold))
+                }
+                if let detail = BadQuery.lastErrorDetail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .padding(.leading, 44)
+                } else {
+                    Text("No containermanager query failure recorded yet. When a bad_query write fails, the daemon's reason appears here.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 44)
+                }
+                HStack(spacing: 12) {
+                    iconTile("link")
+                    Text("AirLift pairing")
+                        .font(.subheadline.weight(.semibold))
+                }
+                Text(AirLiftManager.currentPairingFormat().map {
+                    "Active pairing file format: \($0.label). \($0.routeDescription)"
+                } ?? "No pairing file imported.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 44)
+            }
+            .padding(16)
+            .wsCard(cornerRadius: 18)
+        }
+    }
+
     // MARK: - Supported iOS
 
     private var supportInfo: some View {
@@ -294,9 +335,9 @@ struct SettingsView: View {
                         .font(.subheadline.weight(.semibold))
                 }
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Full features need iOS 27.")
+                    Text("bad_query: iOS 18.x, 26.x, 27.0 dev beta 1–4 / public beta 1–2 / RC / stable.")
                         .font(.subheadline.weight(.medium))
-                    Text("Reads work on any iOS 27 build. Writes depend on the bad_query exploit, which is verified against iOS 27 developer betas 1 to 4.")
+                    Text("AirLift (passcode, wallet): iOS 26.x and 27.x with a pairing file (import) or in-app pairing (iOS 27). Dialer theme on iOS 26 uses bad_query; on iOS 27 it can use AirLift.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

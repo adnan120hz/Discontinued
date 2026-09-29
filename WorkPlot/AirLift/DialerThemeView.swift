@@ -115,14 +115,18 @@ func themeWritePairs(from entries: [ZipEntry]) -> [(String, Data)] {
 // MARK: - DialerThemeView
 
 /// "Dialer Theme (iOS 26.6–26.7, bad_query)": import a `.zip` of telephony UI
-/// assets, preview the file list, and apply them to the Phone app's data
-/// container via `AirLiftFileWriter`.
+/// assets, preview the file list, and apply them to
+/// `/var/mobile/Library/Caches/TelephonyUI-10` via the bad_query class-12
+/// geod lease (FilzaSlop route). A pristine snapshot is taken before the
+/// first Apply so the theme can be restored.
 struct DialerThemeView: View {
     @State private var showPicker = false
     @State private var zipName: String?
     @State private var entries: [ZipEntry] = []
     @State private var status: String?
     @State private var isApplying = false
+    @State private var isRestoring = false
+    @State private var hasBackupSnapshot = DialerBackupStore.hasSnapshot
 
     // MARK: Destination (per AirCard-iOS)
     //
@@ -148,6 +152,7 @@ struct DialerThemeView: View {
                     fileListCard
                     applyCard
                 }
+                backupCard
                 if let status { statusLine(status) }
                 infoCard
             }
@@ -156,6 +161,7 @@ struct DialerThemeView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Dialer Theme")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { hasBackupSnapshot = DialerBackupStore.hasSnapshot }
         .sheet(isPresented: $showPicker) {
             AirLiftDocumentPicker(
                 allowedTypes: [UTType(filenameExtension: "zip") ?? .data],
@@ -261,13 +267,65 @@ struct DialerThemeView: View {
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("Info")
-            Text("ZIPFoundation extracts stored and deflate entries and verifies CRC32; unsafe paths (zip-slip) are rejected. Theme assets are written to /var/mobile/Library/Caches/TelephonyUI-10 (per AirCard-iOS); __MACOSX/ metadata entries are skipped.")
+            Text("ZIPFoundation extracts stored and deflate entries and verifies CRC32; unsafe paths (zip-slip) are rejected. Theme assets are written to /var/mobile/Library/Caches/TelephonyUI-10 via the bad_query class-12 geod lease (FilzaSlop route); __MACOSX/ metadata entries are skipped. A pristine snapshot is taken before the first Apply so Restore can undo the theme.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
         .padding(18)
         .background(Color(uiColor: .tertiarySystemGroupedBackground),
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    // MARK: Backup / Restore (3105-style journaled snapshots)
+
+    private var backupCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader("Backup")
+            if hasBackupSnapshot, let date = DialerBackupStore.snapshotDate() {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.shield.fill")
+                        .foregroundStyle(Theme.affirmative)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Pristine snapshot available").font(.subheadline.weight(.medium))
+                        Text("Taken \(date, style: .date). Restore writes the original files back and removes theme-added files.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                ActionButton(title: "Restore Original Dialer",
+                             systemImage: "arrow.counterclockwise",
+                             isBusy: isRestoring) {
+                    restore()
+                }
+            } else {
+                Text("No snapshot yet. The first Apply automatically snapshots every file it will overwrite, so you can restore the original dialer afterwards.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(18)
+        .background(Color(uiColor: .tertiarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func restore() {
+        guard !isRestoring else { return }
+        isRestoring = true
+        status = nil
+        DispatchQueue.global(qos: .userInitiated).async {
+            let message: String
+            do {
+                let (restored, deleted) = try DialerBackupStore.restore()
+                message = "Restored \(restored) original files, removed \(deleted) theme-added files. Respring to take effect."
+            } catch {
+                message = "Failed: \(error.localizedDescription)"
+            }
+            DispatchQueue.main.async {
+                status = message
+                isRestoring = false
+                hasBackupSnapshot = DialerBackupStore.hasSnapshot
+            }
+        }
     }
 
     private func statusLine(_ message: String) -> some View {
@@ -307,30 +365,52 @@ struct DialerThemeView: View {
         guard isSupportedOS, !files.isEmpty else { return }
         isApplying = true
         status = nil
-        // Off the main thread; AirLiftFileWriter is synchronous file I/O.
+        // Off the main thread; bad_query is synchronous file I/O.
         DispatchQueue.global(qos: .userInitiated).async {
             // Per AirCard-iOS: dialer PNGs go to TelephonyUI-10. Skip
             // __MACOSX/ metadata and strip a single top-level theme folder.
+            // Writes go through the bad_query class-12 geod lease
+            // (FilzaSlop route) — explicit bad_query, never AirLift.
             let pairs = themeWritePairs(from: files)
-            var failures: [String] = []
-            for (relPath, data) in pairs {
-                let dest = (Self.dialerThemeDestinationPath as NSString)
-                    .appendingPathComponent(relPath)
-                do {
-                    try AirLiftFileWriter.writeFile(data: data, to: dest)
-                } catch {
-                    failures.append("\(relPath): \(error.localizedDescription)")
-                }
-            }
             let message: String
-            if failures.isEmpty {
-                message = "Applied \(pairs.count) files. Respring to take effect."
-            } else {
-                message = "Failed: \(failures.count) of \(pairs.count) writes failed. First: \(failures[0])"
+            do {
+                // Snapshot-before-write: journal every file we're about to
+                // overwrite so Restore can undo the theme.
+                let relPaths = pairs.map { $0.0 }
+                let isNewSnapshot = try DialerBackupStore.snapshotBeforeApply(relativePaths: relPaths)
+                var failures: [String] = []
+                try BadQueryLeaseScope.withLibraryCachesLease {
+                    let fm = FileManager.default
+                    for (relPath, data) in pairs {
+                        let dest = (Self.dialerThemeDestinationPath as NSString)
+                            .appendingPathComponent(relPath)
+                        do {
+                            // Ensure the parent directory exists inside the lease.
+                            let parent = (dest as NSString).deletingLastPathComponent
+                            try fm.createDirectory(atPath: parent,
+                                                   withIntermediateDirectories: true)
+                            try data.write(to: URL(fileURLWithPath: dest),
+                                           options: .atomic)
+                        } catch {
+                            // Surface the daemon's reason when available.
+                            let detail = BadQuery.lastErrorDetail.map { " (\($0))" } ?? ""
+                            failures.append("\(relPath): \(error.localizedDescription)\(detail)")
+                        }
+                    }
+                }
+                if failures.isEmpty {
+                    message = "Applied \(pairs.count) files\(isNewSnapshot ? " (snapshot taken)" : ""). Respring to take effect."
+                } else {
+                    message = "Failed: \(failures.count) of \(pairs.count) writes failed. First: \(failures[0])"
+                }
+            } catch {
+                let detail = BadQuery.lastErrorDetail.map { " (\($0))" } ?? ""
+                message = "Failed: \(error.localizedDescription)\(detail)"
             }
             DispatchQueue.main.async {
                 status = message
                 isApplying = false
+                hasBackupSnapshot = DialerBackupStore.hasSnapshot
             }
         }
     }

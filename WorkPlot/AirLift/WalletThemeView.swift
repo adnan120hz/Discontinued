@@ -4,12 +4,12 @@ import UniformTypeIdentifiers
 // MARK: - WalletThemeView
 
 /// "Wallet Image (AirLift)": attach a wallet card (`.pkpass`) first, then
-/// pick a custom image and apply it via `AirLiftFileWriter`.
+/// pick a custom image and apply it via `AirLiftFileWriter` (genuine
+/// on-device AirLift on iOS 26.x and 27.x — no bad_query fallback).
 ///
 /// The Apply button stays disabled until a card is attached
-/// (`AirLiftManager.requiresAttachedCard`) AND a local dev VPN is active
-/// (`VPNCheck.isVPNActive()`), matching the passcode-theme gate: the
-/// wallet-image flow writes through a local developer VPN tunnel.
+/// (`AirLiftManager.requiresAttachedCard`). A missing local dev VPN is a
+/// warning, not a blocker.
 struct WalletThemeView: View {
     @ObservedObject private var manager = AirLiftManager.shared
     @State private var showCardPicker = false
@@ -39,20 +39,17 @@ struct WalletThemeView: View {
     }
 
     private var canApply: Bool {
-        !manager.requiresAttachedCard && imageData != nil && vpnActive && !isApplying
+        !manager.requiresAttachedCard && imageData != nil && manager.isPaired && !isApplying
     }
 
-    /// Local dev-VPN state. Gated like the passcode-theme flow: the wallet
-    /// image is written through a local developer VPN tunnel (utun).
+    /// Local dev-VPN state. A warning, not a blocker: the exploit tries
+    /// 127.0.0.1:49152 first.
     private var vpnActive: Bool { VPNCheck.isVPNActive() }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 SectionHeader("Wallet Image (AirLift)")
-                if !WorkSlopSupport.isIOS27() {
-                    fallbackNoticeCard
-                }
                 cardAttachCard
                 vpnGateCard
                 imagePickerCard
@@ -89,23 +86,6 @@ struct WalletThemeView: View {
 
     // MARK: Cards
 
-    /// Honest fallback notice: on iOS 26.x the on-device AirLift exploit is
-    /// unavailable, so writes go through the bad_query fallback — never
-    /// labeled as AirLift.
-    private var fallbackNoticeCard: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(Theme.caution)
-                .font(.title2)
-            Text("iOS 26.x fallback: the AirLift exploit needs iOS 27+. On this device, writes go through the bad_query fallback instead — not AirLift.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .padding(18)
-        .background(Color(uiColor: .tertiarySystemGroupedBackground),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
     private var cardAttachCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader("Wallet Card", detail: "required")
@@ -139,7 +119,7 @@ struct WalletThemeView: View {
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    // MARK: VPN gate
+    // MARK: VPN gate (warning, not blocker)
 
     private var vpnGateCard: some View {
         Group {
@@ -158,12 +138,12 @@ struct WalletThemeView: View {
             } else {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 10) {
-                        Image(systemName: "network.slash")
+                        Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(Theme.caution)
                             .font(.title2)
-                        Text("Local dev VPN required — blocked").font(.headline)
+                        Text("No local dev VPN — may still work").font(.headline)
                     }
-                    Text("No local dev VPN detected. The wallet-image flow writes through a local developer VPN tunnel (utun interface). Connect your dev VPN profile, then try again. Nothing will be written until then.")
+                    Text("No local dev VPN detected. The exploit tries 127.0.0.1:49152 first and may still succeed — this is a warning, not a blocker.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -211,12 +191,12 @@ struct WalletThemeView: View {
                 Text("Attach a wallet card above to enable Apply.")
                     .font(.footnote)
                     .foregroundStyle(Theme.caution)
-            } else if !vpnActive {
-                Text("Connect a local dev VPN profile to enable Apply.")
+            } else if !manager.isPaired {
+                Text("Pair in AirLift Pairing to enable Apply.")
                     .font(.footnote)
                     .foregroundStyle(Theme.caution)
             } else {
-                Text("Writes the custom image into \(Self.cardArtDirectory(forCardNamed: manager.walletCard?.name ?? "card")) via AirLiftFileWriter.")
+                Text("Writes the custom image into \(Self.cardArtDirectory(forCardNamed: manager.walletCard?.name ?? "card")) via the genuine AirLift exploit.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -235,7 +215,7 @@ struct WalletThemeView: View {
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader("Info")
-            Text("Card attachment is persisted across launches (the .pkpass is copied into the app sandbox). The VPN gate is enforced with VPNCheck.requireVPN()-style utun detection (no entitlements needed) and the flow blocks with an explanation when no local dev VPN is active. The custom image is written through AirLiftFileWriter into /var/mobile/Library/Passes/Cards/<card-id>.pkpass (per AirCard-iOS).")
+            Text("Card attachment is persisted across launches (the .pkpass is copied into the app sandbox). Writes go through the genuine on-device AirLift exploit (iOS 26.x and 27.x). A missing local dev VPN is a warning, not a blocker. The custom image is written into /var/mobile/Library/Passes/Cards/<card-id>.pkpass (per AirCard-iOS).")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -266,10 +246,10 @@ struct WalletThemeView: View {
     }
 
     private func apply() {
-        // Re-check the gate at apply time — the VPN can drop between
-        // rendering and tapping, same as the passcode-theme flow.
-        guard !manager.requiresAttachedCard, VPNCheck.isVPNActive() else {
-            status = "Failed: gate no longer open. Re-check the attached card and the dev VPN."
+        // Re-check pairing at apply time — it can be revoked between
+        // rendering and tapping. VPN is a warning, not a blocker.
+        guard !manager.requiresAttachedCard, manager.isPaired else {
+            status = "Failed: gate no longer open. Re-check the attached card and pairing."
             return
         }
         guard canApply,

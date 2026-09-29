@@ -104,6 +104,23 @@ final class AppDataManager: ObservableObject {
     /// Path of the active container root; browsing never escapes above it.
     private var containerRoot: String? { activeContainer?.root }
 
+    /// Runs `body` inside the appropriate bad_query lease for the active
+    /// container. Prefers the class-2 per-app route (bundle ID) — the kernel
+    /// refuses extensions for the parent `/var/mobile/Containers` directory
+    /// (-4), but grants them for individual app containers. Falls back to
+    /// the path-based lease when no bundle ID is known.
+    private func withContainerLease<T>(_ body: () throws -> T) throws -> T {
+        if let bundleId = activeContainer?.bundleId, !bundleId.isEmpty {
+            return try BadQueryLeaseScope.withAppContainerLease(bundleId: bundleId, body)
+        }
+        guard let root = containerRoot else {
+            throw NSError(domain: "AppDataManager", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "No active container."
+            ])
+        }
+        return try BadQueryLeaseScope.withLease(forPath: root, body)
+    }
+
     /// Path shown in the breadcrumb, relative to the container root.
     var relativePath: String {
         guard let root = containerRoot, currentPath.hasPrefix(root) else { return "/" }
@@ -233,11 +250,11 @@ final class AppDataManager: ObservableObject {
     }
 
     private func listEntries(at path: String) throws -> [AppDataEntry] {
-        let names = try BadQueryLeaseScope.withLease(forPath: path) {
+        let names = try withContainerLease {
             try fm.contentsOfDirectory(atPath: path)
         }
         var result: [AppDataEntry] = []
-        try BadQueryLeaseScope.withLease(forPath: path) {
+        try withContainerLease {
             let ordered = names.sorted {
                 $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
             }
@@ -288,7 +305,7 @@ final class AppDataManager: ObservableObject {
         errorMessage = nil
         defer { busy = false }
         do {
-            try BadQueryLeaseScope.withLease(forPath: root) {
+            try withContainerLease {
                 if fm.fileExists(atPath: destPath) {
                     throw NSError(domain: "AppDataManager", code: 2, userInfo: [
                         NSLocalizedDescriptionKey: "\"\(finalName)\" already exists in the destination."
@@ -325,7 +342,7 @@ final class AppDataManager: ObservableObject {
         errorMessage = nil
         defer { busy = false }
         do {
-            try BadQueryLeaseScope.withLease(forPath: root) {
+            try withContainerLease {
                 try fm.createDirectory(atPath: dest, withIntermediateDirectories: false)
             }
             status = "Created folder \"\(trimmed)\"."
@@ -344,7 +361,7 @@ final class AppDataManager: ObservableObject {
             return nil
         }
         do {
-            return try BadQueryLeaseScope.withLease(forPath: root) {
+            return try withContainerLease {
                 try Data(contentsOf: URL(fileURLWithPath: entry.path))
             }
         } catch {
@@ -374,7 +391,7 @@ final class AppDataManager: ObservableObject {
         errorMessage = nil
         defer { busy = false }
         do {
-            try BadQueryLeaseScope.withLease(forPath: root) {
+            try withContainerLease {
                 try text.write(toFile: entry.path, atomically: true, encoding: .utf8)
             }
             status = "Saved \"\(entry.name)\"."
@@ -400,7 +417,7 @@ final class AppDataManager: ObservableObject {
             let exportDir = fm.temporaryDirectory.appendingPathComponent("appdata-export", isDirectory: true)
             try fm.createDirectory(at: exportDir, withIntermediateDirectories: true)
             let destURL = exportDir.appendingPathComponent(entry.name)
-            try BadQueryLeaseScope.withLease(forPath: root) {
+            try withContainerLease {
                 let data = try Data(contentsOf: URL(fileURLWithPath: entry.path))
                 if fm.fileExists(atPath: destURL.path) {
                     try fm.removeItem(at: destURL)
@@ -437,7 +454,7 @@ final class AppDataManager: ObservableObject {
         errorMessage = nil
         defer { busy = false }
         do {
-            try BadQueryLeaseScope.withLease(forPath: root) {
+            try withContainerLease {
                 if fm.fileExists(atPath: destPath) {
                     try fm.removeItem(atPath: destPath)
                 }

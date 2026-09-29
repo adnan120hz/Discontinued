@@ -25,6 +25,40 @@ struct AirLiftPairingFile: Codable {
     let size: Int
 }
 
+/// Pairing-file format, detected from the file's plist keys:
+/// - `.rpPairing`: RPPairing credentials (`public_key` + `private_key` +
+///   `identifier`) — produced by the in-app Developer Mode pairing (iOS 27).
+///   Unlocks the RSD tunnel (RemoteXPC / raw RPPairing) on port 49152.
+/// - `.lockdown`: classic lockdown pairing record (`HostCertificate` +
+///   `HostID`) — e.g. exported from iDevicePairing / iLoader / SideStore /
+///   iTunes / AltStore / Jitterbug. Unlocks lockdownd on port 62078.
+/// - `.unknown`: neither — the exploit cannot use it, and import says so.
+enum AirLiftPairingFormat {
+    case rpPairing
+    case lockdown
+    case unknown
+
+    var label: String {
+        switch self {
+        case .rpPairing: return "RPPairing credentials"
+        case .lockdown: return "Lockdown pairing record"
+        case .unknown: return "Unrecognized format"
+        }
+    }
+
+    /// Short guidance for what each format unlocks.
+    var routeDescription: String {
+        switch self {
+        case .rpPairing:
+            return "RPPairing credentials — unlocks the RSD tunnel (port 49152)."
+        case .lockdown:
+            return "Lockdown pairing record — unlocks lockdownd (port 62078)."
+        case .unknown:
+            return "Unrecognized format — AirLift cannot use this file."
+        }
+    }
+}
+
 /// A wallet card the user attached (`.pkpass`) before customizing its image.
 struct AirLiftWalletCard: Codable {
     let name: String
@@ -51,9 +85,12 @@ struct AirLiftWalletCard: Codable {
 /// tunnel — no Mac involved. iOS 27+ only.
 ///
 /// ## iOS 26.x
-/// Manual pairing-file import only (file generated on a PC via iLoader /
-/// iDevicePairing). Writes on iOS 26.x go through the bad_query fallback in
-/// `AirLiftFileWriter` — never presented as AirLift.
+/// Manual pairing-file import (file generated on a PC via iLoader /
+/// iDevicePairing). Passcode and wallet writes attempt the genuine AirLift
+/// exploit on iOS 26 exactly as on iOS 27 — the Rust core detects the
+/// pairing format (RPPairing → RSD on 127.0.0.1:49152; lockdown record →
+/// lockdownd on :62078) and reports each stage honestly. There is no
+/// bad_query fallback in the AirLift path.
 @MainActor
 final class AirLiftManager: ObservableObject {
     static let shared = AirLiftManager()
@@ -170,6 +207,31 @@ final class AirLiftManager: ObservableObject {
     /// True when a usable pairing file exists on disk.
     static func hasPairingFile() -> Bool {
         nonEmptyFileSize(at: pairingFilePath()) > 0
+    }
+
+    /// Detects the pairing-file format from its plist keys.
+    /// RPPairing credentials carry `public_key` + `private_key` + `identifier`;
+    /// lockdown records carry `HostCertificate` + `HostID`.
+    nonisolated static func detectPairingFormat(at path: String) -> AirLiftPairingFormat {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let plist = try? PropertyListSerialization.propertyList(
+                from: data, options: [], format: nil) as? [String: Any]
+        else { return .unknown }
+        let keys = Set(plist.keys)
+        if keys.contains("public_key") && keys.contains("private_key")
+            && keys.contains("identifier") {
+            return .rpPairing
+        }
+        if keys.contains("HostCertificate") && keys.contains("HostID") {
+            return .lockdown
+        }
+        return .unknown
+    }
+
+    /// Format of the currently active pairing file (nil when unpaired).
+    nonisolated static func currentPairingFormat() -> AirLiftPairingFormat? {
+        guard hasPairingFile() else { return nil }
+        return detectPairingFormat(at: pairingFilePath())
     }
 
     // MARK: - RPPairing host flow (iOS 27+)
@@ -388,8 +450,15 @@ final class AirLiftManager: ObservableObject {
                 statusMessage = "Import failed: the picked file is empty."
                 return
             }
+            let ext = url.pathExtension.lowercased()
+            guard ext == "plist" || ext == "mobiledevicepairing" || ext == "mobilepair" else {
+                statusMessage = "Import failed: \"\(url.lastPathComponent)\" is not a pairing file. " +
+                    "Expected .plist or .mobiledevicepairing."
+                return
+            }
             let canonical = Self.canonicalPairingPath()
             try data.write(to: URL(fileURLWithPath: canonical), options: .atomic)
+            let format = Self.detectPairingFormat(at: canonical)
             let file = AirLiftPairingFile(
                 name: url.lastPathComponent,
                 storedPath: canonical,
@@ -400,9 +469,21 @@ final class AirLiftManager: ObservableObject {
             pairedDeviceName = nil
             UserDefaults.standard.removeObject(forKey: deviceNameKey)
             persist(file, forKey: fileKey)
-            state = .paired
-            pairingStatus = "Paired via imported file (\(data.count) bytes)"
-            statusMessage = "Pairing file imported: \(file.name)."
+            switch format {
+            case .rpPairing, .lockdown:
+                state = .paired
+                pairingStatus = "Paired via imported file (\(format.label), \(data.count) bytes)"
+                statusMessage = "Pairing file imported: \(file.name). \(format.routeDescription)"
+            case .unknown:
+                state = .unpaired
+                try? FileManager.default.removeItem(atPath: canonical)
+                importedFile = nil
+                UserDefaults.standard.removeObject(forKey: fileKey)
+                pairingStatus = "Not paired"
+                statusMessage = "Import failed: \"\(file.name)\" is not a recognized pairing file " +
+                    "(not RPPairing credentials, not a lockdown record). " +
+                    "On iOS 27, pair in-app via Developer Mode; on iOS 26, export a pairing file from iDevicePairing or iLoader."
+            }
         } catch {
             statusMessage = "Import failed: \(error.localizedDescription)"
         }
@@ -567,9 +648,12 @@ enum VPNCheck {
         return false
     }
 
-    /// Throws `VPNError.noActiveVPN` with a user-facing explanation when no
-    /// local dev VPN is active. The passcode-theme and wallet-image flows
-    /// MUST call this (or check `isVPNActive()`) and block when it throws.
+    /// Advisory check: the passcode-theme and wallet-image flows call
+    /// `isVPNActive()` and WARN (not block) when no `utun` interface is up.
+    /// The exploit always tries `127.0.0.1:49152` first and continues on the
+    /// loopback-VPN subnet regardless — a missing VPN only makes the later
+    /// targets unreachable. `requireVPN()` is kept for compatibility but
+    /// MUST NOT be used to hard-block an apply.
     static func requireVPN() throws {
         guard isVPNActive() else { throw VPNError.noActiveVPN }
     }
