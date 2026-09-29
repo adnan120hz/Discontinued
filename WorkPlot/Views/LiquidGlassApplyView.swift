@@ -132,68 +132,7 @@ struct LiquidGlassApplyView: View {
     /// AFC photo/video safety copy (iOS 27 full-backup flow). Pure copy —
     /// the device originals are never deleted by this backup.
     private var mediaCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader("Photo & video safety copy")
-            Text("Copies DCIM and PhotoStreamsData over AFC into this app's storage. " +
-                 "Each file is verified before anything is removed — and this backup " +
-                 "never removes the device originals.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 12) {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.title3)
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Media store")
-                        .font(.subheadline.weight(.semibold))
-                    Text(model.mediaInfo?.summary ?? "No media stored.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
-            if model.mediaBusy, let progress = model.taskProgress {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text(progress)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            HStack(spacing: 12) {
-                ActionButton(title: "Pull media",
-                             systemImage: "arrow.down.to.line",
-                             isBusy: model.mediaBusy,
-                             disabled: !model.channelReady) {
-                    model.pullMedia()
-                }
-                ActionButton(title: "Push back",
-                             systemImage: "arrow.up.to.line",
-                             isBusy: false,
-                             disabled: model.mediaInfo == nil || model.mediaBusy || !model.channelReady) {
-                    model.pushMediaBack()
-                }
-            }
-            .opacity(model.channelReady ? 1 : 0.45)
-            secondaryButton(title: "Empty store",
-                            systemImage: "trash",
-                            tint: Theme.destructive,
-                            disabled: model.mediaInfo == nil || model.mediaBusy,
-                            action: { model.emptyMediaStore() })
-            if !model.channelReady {
-                Text("Media actions need the device channel — pair AirLift and bring the tunnel up first.")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.caution)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(16)
-        .wsCard(cornerRadius: 18)
+        EmptyView() // removed: media store was part of fullBackup
     }
 
     var body: some View {
@@ -207,7 +146,6 @@ struct LiquidGlassApplyView: View {
                 }
                 flowCard
                 if isIOS27Flow {
-                    mediaCard
                 }
             }
             .padding(Theme.pagePadding)

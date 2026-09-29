@@ -295,7 +295,7 @@ final class LiquidGlassApplyModel: ObservableObject {
     var flow: LiquidGlassFlow { LiquidGlassFlow.current }
 
     func refresh() {
-        refreshChannel()
+        // No-op: channel removed with fullBackup
     }
 
     /// Internal (not private): the LGFullBackup integration extension
@@ -319,12 +319,6 @@ final class LiquidGlassApplyModel: ObservableObject {
 
     func apply(tweaks: [Tweak]) {
         guard !isBusy else { return }
-        // Full-device backup → compile + inject + restore through the
-        // channel. Everything else keeps the existing write path below.
-        if false { // fullBackup removed
-            applyViaFullDevice(tweaks: tweaks)
-            return
-        }
         begin(.applying)
         defer { end() }
         do {
@@ -438,12 +432,6 @@ final class LiquidGlassApplyModel: ObservableObject {
 
     func restore() {
         guard !isBusy else { return }
-        // Full-device backup → restore the pristine liquid-glass files
-        // stashed at backup time through the channel.
-        if false { // fullBackup removed
-            restoreFullDevice()
-            return
-        }
         begin(.restoring)
         defer { end() }
         do {
