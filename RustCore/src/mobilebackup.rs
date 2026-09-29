@@ -6,14 +6,20 @@
 
 use std::ffi::{c_char, c_void};
 
+/// Progress callback type matching Swift's MBProgressCallback.
+pub type MBProgressCallback = Option<extern "C" fn(ctx: *mut c_void, percent: f64, message: *const c_char)>;
+
+/// Log callback type.
+pub type ALLogCallback = *const c_void;
+
 /// Stub: returns error (not implemented).
 #[no_mangle]
 pub unsafe extern "C" fn mb2_backup(
     _pairing_path: *const c_char,
     _udid: *const c_char,
     _backup_root: *const c_char,
-    _log_cb: *const c_void,
-    _progress_cb: *const c_void,
+    _log_cb: ALLogCallback,
+    _progress_cb: MBProgressCallback,
     _ctx: *mut c_void,
     out_error: *mut *mut c_char,
 ) -> i32 {
@@ -30,8 +36,8 @@ pub unsafe extern "C" fn mb2_restore(
     _pairing_path: *const c_char,
     _udid: *const c_char,
     _backup_root: *const c_char,
-    _log_cb: *const c_void,
-    _progress_cb: *const c_void,
+    _log_cb: ALLogCallback,
+    _progress_cb: MBProgressCallback,
     _ctx: *mut c_void,
     out_error: *mut *mut c_char,
 ) -> i32 {
