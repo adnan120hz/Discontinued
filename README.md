@@ -36,7 +36,7 @@ WorkSlop is a free iOS customization app that lets you modify system settings, a
 - 📱 **Tweaks** — MobileGestalt editor (iOS 27.0 dev beta 1–4 / public beta 1–2 only)
 - 🖼️ **PosterBoard** — Wallpaper tweaks (iOS 26.6–26.6.2, 27.0 db1–4/pb1–2)
 - 💎 **Liquid Glass Tweak** — Apple's Liquid Glass UI effect (iOS 26.2–26.x only)
-- 📡 **AirLift** — On-device file access via AirCard pairing
+- 📡 **AirLift** — On-device file access via AirCard pairing. Writes can take up to ~120 seconds per tunnel attempt (the exploit blocks until sync completes). Don't close the app while it's working — wait for the progress indicator to finish.
 - 🔧 **RDARFix** — Custom canvas resolution fix (experimental on iOS 26.6.x)
 - 🛡️ **Backup & Restore** — Automatic backup before each write
 
