@@ -249,14 +249,8 @@ final class MobileBackup2Channel: LGDeviceChannel {
             DispatchQueue.global(qos: .userInitiated).async {
                 var outError: UnsafeMutablePointer<CChar>? = nil
 
-                // Progress callback: forward to Swift
-                let progressCb: MBProgressCallback = { ctx, percent, message in
-                    let msg = message.map { String(cString: $0) } ?? ""
-                    DispatchQueue.main.async {
-                        onProgress(percent / 100.0)
-                    }
-                    print("[mb2] \(Int(percent))% — \(msg)")
-                }
+                // Progress callback: nil (stub doesn't use it)
+                let progressCb: MBProgressCallback? = nil
 
                 let rc = pairingURL.path.withCString { pairC in
                     udid.withCString { udidC in
@@ -302,13 +296,7 @@ final class MobileBackup2Channel: LGDeviceChannel {
             DispatchQueue.global(qos: .userInitiated).async {
                 var outError: UnsafeMutablePointer<CChar>? = nil
 
-                let progressCb: MBProgressCallback = { ctx, percent, message in
-                    let msg = message.map { String(cString: $0) } ?? ""
-                    DispatchQueue.main.async {
-                        onProgress(percent / 100.0)
-                    }
-                    print("[mb2] restore \(Int(percent))% — \(msg)")
-                }
+                let progressCb: MBProgressCallback? = nil
 
                 let rc = pairingURL.path.withCString { pairC in
                     sourceIdentifier.withCString { udidC in
