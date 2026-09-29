@@ -402,18 +402,6 @@ struct LiquidGlassApplyView: View {
 
     private var backupStatusText: String {
         switch model.flow {
-        // .fullBackup removed:
-            if model.backupMode == .fullDevice {
-                return "Full device backup ready — Apply will inject and restore."
-            }
-            if model.backupMode == .preferenceSnapshot {
-                return "Preference snapshot ready — not a full device backup."
-            }
-            if let info = model.backupInfo {
-                let size = ByteCountFormatter.string(fromByteCount: Int64(info.totalBytes), countStyle: .file)
-                return "Backup from \(info.createdAt.formatted(date: .abbreviated, time: .shortened)) • \(size)"
-            }
-            return "No backup yet — press Backup first."
         case .partialRestore:
             return "Pre-apply snapshots are captured automatically."
         case .unsupported:
@@ -459,8 +447,6 @@ struct LiquidGlassApplyView: View {
 
     private var restoreTitle: String {
         switch model.flow {
-        // .fullBackup removed:
-            return model.backupMode == .fullDevice ? "Restore pristine files" : "Restore full backup"
         case .partialRestore:
             return "Undo last apply"
         case .unsupported:
@@ -470,10 +456,6 @@ struct LiquidGlassApplyView: View {
 
     private var restoreHint: String {
         switch model.flow {
-        // .fullBackup removed:
-            return model.backupMode == .fullDevice
-                ? "Restore the pristine liquid-glass files stashed at backup time"
-                : "Restore the pristine liquid-glass backup"
         case .partialRestore:
             return "Revert the last partial-restore apply"
         case .unsupported:
@@ -483,8 +465,6 @@ struct LiquidGlassApplyView: View {
 
     private var restoreDisabled: Bool {
         switch model.flow {
-        // .fullBackup removed:
-            return model.backupInfo == nil && model.backupMode != .fullDevice
         case .partialRestore: return !model.canUndoPartial
         case .unsupported: return true
         }

@@ -317,38 +317,10 @@ final class LiquidGlassApplyModel: ObservableObject {
         refresh()
     }
 
-    /// Backup now runs through `LGBackupEngine`: a real device backup when
-    /// the AirLift device channel is usable, otherwise the honest
-    /// preference-snapshot fallback (`LiquidGlassBackupStore`). `backupMode`
-    /// records which one ran so the UI can label it truthfully.
+    /// Backup removed: partial-restore flow applies directly with no backup step.
+    /// This is a no-op kept for API compatibility.
     func createBackup() {
-        guard !isBusy else { return }
-        begin(.backingUp)
-        taskProgress = "Starting backup…"
-        Task {
-            defer {
-                taskProgress = nil
-                end()
-            }
-            do {
-                let result = try await LGBackupEngine.shared.runBackup { message in
-                    self.taskProgress = message
-                }
-                backupMode = result.mode
-                warnings = []
-                switch result.mode {
-                case .fullDevice:
-                    backupInfo = nil
-                    statusMessage = "Full device backup complete. You can now press Apply."
-                case .preferenceSnapshot:
-                    backupInfo = LiquidGlassBackupStore.info()
-                    statusMessage = "Preference snapshot created — not a full device backup. You can now press Apply."
-                }
-            } catch {
-                statusMessage = nil
-                warnings = [error.localizedDescription]
-            }
-        }
+        statusMessage = "Partial-restore flow: no backup needed."
     }
 
     func apply(tweaks: [Tweak]) {
