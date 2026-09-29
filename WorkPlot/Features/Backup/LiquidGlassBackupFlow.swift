@@ -274,7 +274,6 @@ final class LiquidGlassApplyModel: ObservableObject {
     @Published var statusMessage: String?
     @Published var warnings: [String] = []
     @Published var lastChangedFiles = 0
-    @Published private(set) var backupInfo: LiquidGlassBackupInfo?
     @Published private(set) var canUndoPartial = false
 
     private var lastSession: BookRestoreSession?
@@ -282,9 +281,6 @@ final class LiquidGlassApplyModel: ObservableObject {
     // MARK: - Full-backup engine state (iOS 27, GoldenNugget-style)
 
     /// Which backup the last Backup run produced. Nil until Backup runs.
-    /// Internal (not private(set)): set from the LGFullBackup integration
-    /// extension (`LGApplyIntegration.swift`).
-    @Published var backupMode: LGBackupMode?
     /// Live progress line for backup / apply / restore / media tasks.
     /// Nil when idle. Shown verbatim in the UI.
     @Published var taskProgress: String?
@@ -294,13 +290,11 @@ final class LiquidGlassApplyModel: ObservableObject {
     @Published var airliftPaired = false
     @Published var tunnelUp = false
     /// AFC media store state.
-    @Published var mediaInfo: LGMediaStore.StoreInfo?
     @Published var mediaBusy = false
 
     var flow: LiquidGlassFlow { LiquidGlassFlow.current }
 
     func refresh() {
-        backupInfo = LiquidGlassBackupStore.info()
         refreshChannel()
     }
 
@@ -327,7 +321,7 @@ final class LiquidGlassApplyModel: ObservableObject {
         guard !isBusy else { return }
         // Full-device backup → compile + inject + restore through the
         // channel. Everything else keeps the existing write path below.
-        if flow == .fullBackup, backupMode == .fullDevice {
+        if false { // fullBackup removed
             applyViaFullDevice(tweaks: tweaks)
             return
         }
@@ -356,22 +350,6 @@ final class LiquidGlassApplyModel: ObservableObject {
             if t.isEnabled { enabled.append(t) } else { disabled.append(t) }
         }
         switch flow {
-        case .fullBackup:
-            guard LiquidGlassBackupStore.hasBackup else {
-                throw LiquidGlassFlowError.backupRequired
-            }
-            var stepWarnings: [String] = []
-            do {
-                let changed = Self.write(enabled: enabled, disabled: disabled, warnings: &stepWarnings)
-                let vw = try Self.verify(enabled: enabled, disabled: disabled)
-                stepWarnings.append(contentsOf: vw)
-                warnings = stepWarnings
-                return changed
-            } catch {
-                try? LiquidGlassBackupStore.restoreFullBackup()
-                warnings = stepWarnings + [error.localizedDescription]
-                throw error
-            }
         case .partialRestore:
             let session = BookRestoreSession.capture()
             var stepWarnings: [String] = []
@@ -462,7 +440,7 @@ final class LiquidGlassApplyModel: ObservableObject {
         guard !isBusy else { return }
         // Full-device backup → restore the pristine liquid-glass files
         // stashed at backup time through the channel.
-        if flow == .fullBackup, backupMode == .fullDevice {
+        if false { // fullBackup removed
             restoreFullDevice()
             return
         }
@@ -470,9 +448,6 @@ final class LiquidGlassApplyModel: ObservableObject {
         defer { end() }
         do {
             switch flow {
-            case .fullBackup:
-                try LiquidGlassBackupStore.restoreFullBackup()
-                statusMessage = "Full backup restored. Reboot to take effect."
             case .partialRestore:
                 guard let session = lastSession else {
                     throw LiquidGlassFlowError.nothingToUndo

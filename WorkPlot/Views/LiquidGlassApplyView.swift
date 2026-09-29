@@ -28,7 +28,7 @@ struct LiquidGlassApplyView: View {
 
     private var isIOS27Flow: Bool { false } // fullBackup removed; partial-restore only
     private var backupMissing: Bool {
-        isIOS27Flow && model.backupInfo == nil && model.backupMode != .fullDevice
+        false // backup removed; partial-restore only
     }
 
     // MARK: - Full backup (iOS 27, GoldenNugget-style)
@@ -40,28 +40,7 @@ struct LiquidGlassApplyView: View {
     /// restore-on-reboot: the restore is the step that applies the tweaks,
     /// and the reboot afterwards is manual.
     private var fullBackupCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader("Full Backup")
-            switch model.backupMode {
-            case .fullDevice:
-                modeStatusRow(icon: "externaldrive.fill",
-                              title: "Full device backup",
-                              detail: "Pulled from the device over the AirLift channel, " +
-                                      "GoldenNugget-style. The working backup is temporary — " +
-                                      "it is wiped when the next backup runs, so restore " +
-                                      "before backing up again.")
-            case .preferenceSnapshot:
-                modeStatusRow(icon: "doc.fill",
-                              title: "Preference snapshot — not a full device backup",
-                              detail: "Covers the liquid-glass preference files only. " +
-                                      "The full-device path needs the on-device AirLift " +
-                                      "channel, which is not ready yet.")
-            case nil:
-                prerequisitesList
-            }
-        }
-        .padding(16)
-        .wsCard(cornerRadius: 18)
+        EmptyView() // removed: partial-restore only
     }
 
     private var prerequisitesList: some View {
