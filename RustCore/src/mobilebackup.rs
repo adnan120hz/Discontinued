@@ -13,7 +13,7 @@ use std::pin::Pin;
 use std::future::Future;
 use std::io::{Read, Write};
 
-use idevice::mobilebackup2::{BackupDelegate, FsBackupDelegate, MobileBackup2Client};
+use idevice::services::mobilebackup2::{BackupDelegate, FsBackupDelegate, MobileBackup2Client};
 use idevice::{Idevice, IdeviceError};
 
 use crate::exploit::{ALLogCallback, AppDeviceTunnel, Logger, connect_service_lockdown, connect_tunnel, stage_err};
