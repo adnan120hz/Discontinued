@@ -24,13 +24,13 @@ enum WorkSlopExploitPath {
 ///
 /// | Exploit       | iOS Range              | Patched In | Notes                     |
 /// |---------------|------------------------|------------|---------------------------|
-/// | bad_query     | 26.0–26.6.1, 27.0b1–b5 | —          | Sandbox escape (18.x untested) |
+/// | bad_query     | 26.6–26.6.2, 27.0 db1-4/pb1-2 | —     | Per user spec (narrow)    |
 /// | darksword     | 17.0–18.7.1, 26.0–26.0.1 | 18.7.2/26.1 | Kernel r/w (tool offsets) |
 /// | kfd           | 15.0 – 16.6.1          | 17.0       | Kernel File Descriptor    |
-/// | airlift       | 27.0 only              | —          | Pairing-based (NOT 26.6)  |
+/// | airlift       | 18+                    | —          | Per user: iOS 18+         |
 /// | book restore  | 18.2 – 26.1            | 26.2b2     | Books daemon escape (NOT backup) |
 /// | sparse restore| 15.2–17.7, 18.0–18.1b4 | 17.7.1/18.1| CVE-2024-44252 (backup-based) |
-/// | afc           | All (Media-scoped)     | —          | NOT patched on 27 (user claim false) |
+/// | afc           | All (Media-scoped)     | —          | NOT patched on 27         |
 enum WorkSlopExploit {
     case badQuery
     case darksword
@@ -62,17 +62,16 @@ enum WorkSlopExploit {
 
         switch self {
         case .badQuery:
-            // iOS 26.0–26.6.1, 27.0 beta 1–5 (forcequitOS/bad_query)
-            // iOS 18 explicitly untested by author — not claimed.
+            // iOS 26.6/26.6.1/26.6.2, 27.0 developer beta 1-4 / public beta 1-2
+            // (per user spec — NOT the broader research range)
             if major == 26 {
-                // 26.0 to 26.6.1
-                if minor < 6 { return true }
-                if minor == 6 && patch <= 1 { return true }
+                // Only 26.6, 26.6.1, 26.6.2
+                if minor == 6 && patch <= 2 { return true }
                 return false
             }
             if major == 27 {
-                // Beta 1-5 only (per author: "works on 27.0b5")
-                // Without build info, assume supported on 27.0
+                // Developer beta 1-4 / Public beta 1-2 only
+                // Without build info, assume supported on 27.0 betas
                 return minor == 0
             }
             return false
@@ -100,10 +99,9 @@ enum WorkSlopExploit {
             return major == 15 || major == 16
 
         case .airlift:
-            // iOS 27.0 ONLY (0xjohnnydev/airlift)
-            // CORRECTION: prior "26.6 → 27.0" was WorkSlop-side invention.
-            // Upstream AirLift is 27.0-only (tested 27.0 RC 24A435).
-            return major == 27 && minor == 0
+            // iOS 18+ (per user: AirLift supports iOS 18 and above)
+            // Based on AirCard and AirLift repos.
+            return major >= 18
 
         case .bookRestore:
             // iOS 18.2 – 26.1 (patched in 26.2b2, CVE-2025-46286)
