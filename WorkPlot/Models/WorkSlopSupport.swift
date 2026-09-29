@@ -344,6 +344,20 @@ enum WorkSlopSupport {
         return isAtLeast(v, major: 26, minor: 2)
     }
 
+    /// RDARFix custom canvas: experimental on iOS 26.6/26.6.1/26.6.2.
+    /// On iOS 27.0 dev beta 1-4 / public beta 1-2 it's covered by the full
+    /// MobileGestalt path (mobileGestaltAvailable).
+    ///
+    /// The canvas plist paths are probed via bad_query; on 26.6.x the
+    /// target file may not be reachable, so this is marked experimental.
+    static func rdarFixAvailable() -> Bool {
+        let v = currentVersion
+        if v.majorVersion == 26 && v.minorVersion == 6 && v.patchVersion <= 2 {
+            return true
+        }
+        return mobileGestaltAvailable()
+    }
+
     // MARK: Best path
 
     /// The most capable available path, most-capable first.

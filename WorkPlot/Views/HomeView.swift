@@ -355,36 +355,53 @@ struct HomeView: View {
 
     @ViewBuilder
     private func toolRow(_ tool: ToolDef) -> some View {
+        // iOS gating for tools:
+        // - RDARFix: experimental on iOS 26.6/26.6.1/26.6.2, full on 27.0 db1-4/pb1-2
+        // - All other tools: only on iOS 27.0 db1-4/pb1-2
+        let supported: Bool = {
+            if tool.id == "rdarfix" {
+                return WorkSlopSupport.rdarFixAvailable()
+            }
+            return WorkSlopSupport.mobileGestaltAvailable()
+        }()
+        let isExperimentalRdar = tool.id == "rdarfix" && !WorkSlopSupport.mobileGestaltAvailable() && WorkSlopSupport.rdarFixAvailable()
         let label = HStack(spacing: 12) {
-            Image(systemName: tool.symbol)
+            Image(systemName: supported ? tool.symbol : "lock.fill")
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(width: 40, height: 40)
-                .background(Theme.wsBlue.opacity(0.55), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .background((supported ? Theme.wsBlue.opacity(0.55) : Color.gray.opacity(0.4)), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(tool.title)
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(supported ? .primary : .secondary)
                     .lineLimit(2)
-                Text(tool.subtitle)
+                Text(!supported ? "Requires iOS 27.0 beta 1-4" :
+                     isExperimentalRdar ? "EXPERIMENTAL on iOS 26.6.x — canvas file may not be reachable" :
+                     tool.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
             }
             .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 6)
-            Image(systemName: "chevron.right")
+            Image(systemName: !supported ? "lock.fill" : "chevron.right")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(!supported ? Color.gray : .tertiary)
         }
         .padding(.vertical, 9)
         .contentShape(Rectangle())
-        if let destination = tool.destination {
-            NavigationLink(destination: destination()) { label }
-                .buttonStyle(.plain)
-        } else if let action = tool.action {
-            Button(action: action) { label }
-                .buttonStyle(.plain)
+        .opacity(supported ? 1.0 : 0.6)
+        Group {
+            if let destination = tool.destination {
+                NavigationLink(destination: destination()) { label }
+                    .buttonStyle(.plain)
+                    .disabled(!supported)
+            } else if let action = tool.action {
+                Button(action: action) { label }
+                    .buttonStyle(.plain)
+                    .disabled(!supported)
+            }
         }
     }
 
