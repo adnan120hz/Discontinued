@@ -205,7 +205,7 @@ final class AirLiftManager: ObservableObject {
     }
 
     /// True when a usable pairing file exists on disk.
-    static func hasPairingFile() -> Bool {
+    nonisolated static func hasPairingFile() -> Bool {
         nonEmptyFileSize(at: pairingFilePath()) > 0
     }
 

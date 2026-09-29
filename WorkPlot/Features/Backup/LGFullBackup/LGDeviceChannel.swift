@@ -274,7 +274,7 @@ final class MobileBackup2Channel: LGDeviceChannel {
                     let detail: String
                     if let errPtr = outError {
                         detail = String(cString: errPtr)
-                        al_string_free(errPtr)
+                        free(errPtr)
                     } else {
                         detail = "unknown error (rc=\(rc))"
                     }
@@ -326,7 +326,7 @@ final class MobileBackup2Channel: LGDeviceChannel {
                     let detail: String
                     if let errPtr = outError {
                         detail = String(cString: errPtr)
-                        al_string_free(errPtr)
+                        free(errPtr)
                     } else {
                         detail = "unknown error (rc=\(rc))"
                     }
