@@ -1,132 +1,97 @@
 <div align="center">
 
-<img src="docs/assets/logo.png" alt="WorkPlot app icon" width="128" height="128">
+<img src="docs/assets/workslop-logo.png" alt="WorkSlop app icon" width="128" height="128">
 
-# WorkPlot
+# WorkSlop
 
-**On-device MobileGestalt editor for iOS 27 — no PC required**
+**On-device iOS system modification tools — no PC required**
 
 <p>
-  <a href="https://github.com/forcequitOS/bad_query"><img src="https://img.shields.io/badge/exploit-bad__query-purple?style=flat-square" alt="bad_query"></a>
-  <img src="https://img.shields.io/badge/platform-iOS%2027%20betas%201%E2%80%934-black?style=flat-square&logo=apple&logoColor=white" alt="Platform">
+  <img src="https://img.shields.io/badge/status-beta%201-orange?style=flat-square" alt="Beta 1">
+  <img src="https://img.shields.io/badge/platform-iOS%2026.2%2B-black?style=flat-square&logo=apple&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/language-Swift-orange?style=flat-square&logo=swift&logoColor=white" alt="Language">
-  <img src="https://img.shields.io/badge/status-experimental-red?style=flat-square" alt="Status">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPLv3-6E56CF?style=flat-square" alt="GPLv3"></a>
 </p>
 
-<a href="https://github.com/gievano/WorkPlot/releases/latest"><b>Download IPA</b></a> ·
-<a href="#requirements">Requirements</a> ·
-<a href="#install">Install</a> ·
-<a href="#credits">Credits</a>
+<a href="https://github.com/adnan120hz/WorkSlop/releases/latest"><b>Download IPA (Beta 1)</b></a> ·
+<a href="#-requirements">Requirements</a> ·
+<a href="#-install">Install</a> ·
+<a href="#-credits">Credits</a>
 
 </div>
 
 > [!WARNING]
-> WorkPlot modifies system state through a sandbox escape. It can break system features and may require restoring the device. Keep a backup before you experiment. Use at your own risk.
+> **WorkSlop modifies system state through sandbox escapes and backup restores. It can break system features and may require restoring your device.**
+>
+> **ALWAYS keep a full backup of your device before using WorkSlop. We are NOT responsible for any damage, data loss, bootloops, or bricked devices. Use entirely at your own risk.**
 
-WorkPlot edits MobileGestalt values and system files on iOS 27 betas without a jailbreak. It builds on the `bad_query` sandbox escape and ships a full MobileGestalt tweak catalog plus its own tools. Every write is backed up first, so a bad tweak can be undone.
+## What is WorkSlop?
 
-## What's new
+WorkSlop is a free iOS customization app that lets you modify system settings, apply tweaks, and customize your iPhone/iPad without a PC or jailbreak. It uses real exploit techniques (bad_query sandbox escape, AirLift, backup restore) to write system preferences.
 
-WorkPlot keeps the original catalog and exploit core, and adds:
-
-- Light, dark, and system appearance modes.
-- Extra tools in the same catalog: Device Spoof, Gestalt Field Editor, Preset Lab, Session Log, Check for Updates, CarPlay Wallpaper, and the RDAR canvas fix.
-- Alternate app icons and a per-install badge so two installs can run side by side.
-- Write verification: the app reads the plist back and reports "verified on disk" or "write not visible on disk" instead of pretending the write worked.
+**This is Beta 1** — expect bugs. Not all features are fully tested. See [Beta 1 Known Issues](#-beta-1-known-issues) below.
 
 ## Features
 
-- 📱 Runs entirely on iPhone and iPad — no PC required
-- 🛠️ **Gestalt tweaks** — toggle capabilities by category (Display, System, Device, Liquid Glass, iPad), cover Dynamic Island on unsupported devices, Model Name, EU and iPad features, all as one MobileGestalt write
-- 🖼️ **RDAR canvas fix** — write your panel's native size into MobileGestalt to fix the RDAR wallpaper bug, or set any width and height by hand
-- 🔎 **Gestalt Field Editor** — edit MobileGestalt keys directly and inspect CacheData as hex
-- 🧪 **Preset Lab** — build and save MobileGestalt presets to re-apply later
-- 🧠 **Siri AI suite** — enable the new Siri AI and Apple Intelligence through the CacheData patch, with optional spoofing to iPhone 15/16/17 Pro and Pro Max
-- 💎 **Liquid Glass** — turn on Apple's Liquid Glass UI effect
-- 🛡️ **Backup and restore** — automatic backup before each write, JSON snapshots you can export or import, plus the RDARFix repair tool
-- 🕵️ **Device Spoof** — spoof device identity (model and region)
-- 🚗 **CarPlay Wallpaper** — set the CarPlay wallpaper
-- 📜 **Session Log** — view the exploit session debug logs
-- 🔄 **Check for Updates** — in-app update checker
-- 🔁 **Respring** — restart SpringBoard without a full reboot
-- 🎨 **Customization** — light/dark/system appearance, and alternate app icons
+- 📱 **Tweaks** — MobileGestalt editor (iOS 27.0 dev beta 1–4 / public beta 1–2 only)
+- 🖼️ **PosterBoard** — Wallpaper tweaks (iOS 26.6–26.6.2, 27.0 db1–4/pb1–2)
+- 💎 **Liquid Glass** — Apple's Liquid Glass UI effect (iOS 26.2–26.x only)
+- 📡 **AirLift** — On-device file access via AirCard pairing
+- 🔧 **RDARFix** — Custom canvas resolution fix (experimental on iOS 26.6.x)
+- 🛡️ **Backup & Restore** — Automatic backup before each write
 
-## Requirements
+## ⚠️ Beta 1 Known Issues
 
-WorkPlot runs on iPhone and iPad. Reads work on any iOS 27 build. Writes depend on the `bad_query` exploit, which is verified against iOS 27 developer betas 1 through 4. On a build the exploit is not verified against, the sandbox escape can fail with a kernel refusal and writes will not land. The app shows the failure instead of pretending the write worked.
+- **DarkSword / Other Exploit menu does NOT work in Beta 1.** The DarkSword kernel exploit backend is not bundled. The menu is a feature catalog only — all toggles are disabled.
+- **Tweaks are not fully tested.** The tweak catalog has not been validated on all supported iOS versions. Some tweaks may not apply correctly.
+- **RDARFix on iOS 26.6.x is experimental.** The canvas plist may not be reachable via bad_query on 26.6.x.
+- **No device testing by developers.** This app is built on CI (GitHub Actions) without physical device testing. A green build means it compiled, not that it works on your device.
 
-There are two interface builds in this repo. **WP Old UI** is the original interface where PosterBoard does not run. **WP New UI** is the newer interface where PosterBoard runs. The tools and tweak catalog are the same between them.
+## 📋 Requirements
 
-## Compatibility
+- iPhone or iPad running:
+  - **Tweaks:** iOS 27.0 developer beta 1–4 / public beta 1–2
+  - **PosterBoard:** iOS 26.6 / 26.6.1 / 26.6.2, iOS 27.0 db1–4 / pb1–2
+  - **Liquid Glass:** iOS 26.2 – 26.x (NOT iOS 27, NOT iOS 18)
+  - **RDARFix:** iOS 26.6.x (experimental) or 27.0 db1–4/pb1–2
+- Sideloading method (AltStore, SideStore, TrollStore, or developer signing)
 
-| iOS Version              | MobileGestalt Editing | PosterBoard    |
-| ------------------------ | --------------------- | -------------- |
-| iOS 18.x and earlier     | ❌ Unsupported        | ❌ Unsupported |
-| iOS 26.0 – 26.6          | ❌ Unsupported        | ✅ Supported   |
-| iOS 27.0 Beta 1 – Beta 4 | ✅ Supported          | ✅ Supported   |
-| Later versions           | ❌ Patched            | ❌ Unsupported |
+## 📲 Install
 
-## Install
+1. Download `WorkSlop.ipa` from the [latest release](https://github.com/adnan120hz/WorkSlop/releases/latest)
+2. Sideload using your preferred method (AltStore / SideStore / TrollStore)
+3. **Back up your device first** (iCloud or iTunes/Finder backup)
+4. Open WorkSlop and follow the on-screen guides
 
-1. Download `WorkPlot.ipa` from [Releases](https://github.com/gievano/WorkPlot/releases/latest).
-2. Install [iLoader](https://github.com/nab138/iloader), connect your device, and sign in with your Apple ID (used only for local signing).
-3. Import the IPA to sign and install it, then trust the certificate under Settings → General → VPN & Device Management.
+## 📝 Activity Log
 
-## Quick start
+### Beta 1 (2026-09-29)
+- Initial public beta release
+- iOS-gated Tweaks menu (27.0 db1–4/pb1–2 only)
+- PosterBoard menu (26.6–26.6.2, 27.0 betas)
+- Liquid Glass menu (26.2–26.x, blocked on 27)
+- RDARFix experimental support on 26.6.x
+- AirLift on-device file access
+- English UI
 
-1. Open WorkPlot and grant the sandbox escape from the status area.
-2. Open Backups and make a snapshot before changing anything.
-3. Toggle a tweak or open a tool, then apply. The app prompts for a respring when one is needed.
-4. If something breaks, restore the snapshot and report the issue.
+## ⚖️ License
 
-### RDAR canvas fix
+WorkSlop is licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE).
 
-The status area has two controls for the RDAR wallpaper bug. **Fix rdar** writes your panel's native size into MobileGestalt (`MainScreenCanvasSizes`). **Custom Canvas** lets you type any width and height, for example 828 x 1792 on an iPhone 11. After applying, WorkPlot reads the plist back from disk and reports "verified on disk" or "write not visible on disk, blocked by system", so a silently dropped write does not look like success. Canvas values are read at boot, and WorkPlot cannot reboot a sandboxed device, so heavy tweaks show a restart prompt.
+This is required because WorkSlop is derived from GPL-licensed code (WorkPlot, bad_query). You may use, modify, and redistribute this software under the terms of the GPL-3.0.
 
-### Siri AI and Apple Intelligence
+Third-party components and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-1. In the Siri AI screen, toggle **Enable New Siri AI (CacheData)**.
-2. Pick a device spoof target if Apple Intelligence rejects your hardware.
-3. Apply changes, then confirm the respring.
-4. Spoofing can break Face ID until you revert it, so keep a snapshot handy.
+## 🙏 Credits
 
-## Troubleshooting
+- **adnan.120hz** — WorkSlop developer & maintainer
+- **Gievano** ([gievano/WorkPlot](https://github.com/gievano/WorkPlot)) — Original WorkPlot app that WorkSlop is based on
+- **forcequitOS** ([forcequitOS/bad_query](https://github.com/forcequitOS/bad_query)) — bad_query sandbox escape
+- **Mak5er** ([Mak5er/AirCard-iOS](https://github.com/Mak5er/AirCard-iOS)) — AirCard on-device implementation
+- **Johnny Franks** ([0xjohnnydev](https://github.com/0xjohnnydev)) — AirLift exploit, FilzaSlop technique
+- **GoldenNugget** developer — Liquid Glass tweak reference
+- **mond** — MobileGestalt research references
 
-| Symptom                              | Fix                                                                                                                                                |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tweaks fail to apply                 | Re-grant the sandbox escape from the status area                                                                                                   |
-| Strange behavior after Gestalt edits | Restore your latest snapshot                                                                                                                       |
-| RDAR bug after edits                 | Run RDARFix or Custom Canvas. "verified on disk" means the write landed; if iOS still ignores the value, the fix cannot help on that build         |
-| Respring does nothing                | The WebKit respring trick may be patched on your beta. The overlay recovers after ten seconds and reports the failure; restart the device manually |
+---
 
-## Credits
-
-WorkPlot is a rebrand and continuation of an earlier MobileGestalt editor.
-
-**Base app**
-
-- **Ketamine by Nouvborne** — the original MobileGestalt editor and tweak catalog this app is ported from. [Repo](https://github.com/Nouvborne/Ketamine) · [GitHub](https://github.com/Nouvborne)
-
-**Exploit and techniques**
-
-- `bad_query` sandbox escape: [forcequitOS/bad_query](https://github.com/forcequitOS/bad_query) (GPLv3, incorporated)
-- `bad_query` class-13 MobileGestalt route: parameters cross-checked against the MobileHouseArrest-PoC notes (mond / 0xjohnnydev); demonstrated end-to-end by [0xjohnnydev/FilzaSlop](https://github.com/0xjohnnydev/FilzaSlop)
-- Respring method: [rooootdev/neospring](https://github.com/rooootdev/neospring); WebKit variant by @neonmodder123, Swift port by @skadz108
-- MobileGestalt tweak semantics: [leminlimez/Nugget](https://github.com/leminlimez/Nugget) and [GestaltEdit](https://github.com/leminlimez/GestaltEdit)
-
-**Reference apps**
-
-- [GoldenNugget-Team/GoldenNugget-mobile](https://github.com/GoldenNugget-Team/GoldenNugget-mobile) — Liquid Glass tweaks reference
-
-**Individuals:** Mond.
-
-Full attribution and licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). WorkPlot incorporates GPLv3-licensed `bad_query` source code.
-
-## License
-
-WorkPlot is distributed under the [GPLv3 license](LICENSE).
-
-## Disclaimer
-
-This project has no affiliation with Apple Inc. It modifies system state and may break your device. Use it at your own risk.
+**Disclaimer:** WorkSlop is an independent project for iOS security research and education. Not affiliated with Apple Inc. All damage from using this software is your own responsibility. Keep a backup.
