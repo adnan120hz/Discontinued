@@ -382,7 +382,7 @@ final class MobileBackup2Channel: LGDeviceChannel {
 typealias MBProgressCallback = @convention(c) (UnsafeMutableRawPointer?, Double, UnsafePointer<CChar>?) -> Void
 
 /// Pull device backup via mobilebackup2 (Rust).
-@_silgen_name("mb2_backup")
+/// TEMP STUB: Returns "not implemented" until genuine Rust impl is fixed.
 func mb2_backup(
     _ pairingPath: UnsafePointer<CChar>,
     _ udid: UnsafePointer<CChar>,
@@ -391,10 +391,17 @@ func mb2_backup(
     _ progressCb: MBProgressCallback?,
     _ ctx: UnsafeMutableRawPointer?,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> Int32
+) -> Int32 {
+    let msg = "mobilebackup2 not yet implemented"
+    msg.withCString { cStr in
+        let dup = strdup(cStr)
+        outError?.pointee = dup
+    }
+    return -1
+}
 
 /// Restore device backup via mobilebackup2 (Rust).
-@_silgen_name("mb2_restore")
+/// TEMP STUB: Returns "not implemented" until genuine Rust impl is fixed.
 func mb2_restore(
     _ pairingPath: UnsafePointer<CChar>,
     _ udid: UnsafePointer<CChar>,
@@ -403,4 +410,11 @@ func mb2_restore(
     _ progressCb: MBProgressCallback?,
     _ ctx: UnsafeMutableRawPointer?,
     _ outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
-) -> Int32
+) -> Int32 {
+    let msg = "mobilebackup2 not yet implemented"
+    msg.withCString { cStr in
+        let dup = strdup(cStr)
+        outError?.pointee = dup
+    }
+    return -1
+}
