@@ -149,7 +149,7 @@ final class AppDataManager: ObservableObject {
         var leaseWorks = false
         for root in Self.containerRoots {
             do {
-                let handle = try BadQuery.consume(path: root, create: true)
+                let handle = try BadQuery.consume(path: root, create: false)
                 handle.release()
                 leaseWorks = true
                 break
