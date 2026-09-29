@@ -25,12 +25,12 @@ enum WorkSlopExploitPath {
 /// | Exploit       | iOS Range        | Patched In | Notes                           |
 /// |---------------|------------------|------------|---------------------------------|
 /// | bad_query     | 18.x, 26.x, 27.0 | —          | Sandbox escape via containermanager |
-/// | darksword     | 15.0 – 26.0.1    | 26.1       | Kernel r/w (opa334)             |
+/// | darksword     | 15.0 – 26.0.1    | 26.1       | Kernel r/w (opa334/darksword)   |
 /// | kfd           | 15.0 – 16.6.1    | 17.0       | Kernel File Descriptor          |
 /// | airlift       | 26.6 – 27.x      | —          | Pairing-based (AirCard)         |
-/// | book restore  | TBD (research)   | —          | Backup/restore based            |
-/// | sparse restore| TBD (research)   | —          | Backup/restore based            |
-/// | afc           | TBD (research)   | —          | Apple File Conduit              |
+/// | book restore  | 17.0 – 17.x?     | TBD        | Backup/restore based (research pending) |
+/// | sparse restore| 16.0 – 17.0?     | TBD        | Backup/restore based (research pending) |
+/// | afc           | < 27             | 27?        | Apple File Conduit (user claims patched on 27) |
 enum WorkSlopExploit {
     case badQuery
     case darksword
