@@ -322,6 +322,28 @@ enum WorkSlopSupport {
         return isAtLeast(v, major: 26, minor: 6) && v.majorVersion <= 27
     }
 
+    /// PosterBoard menu: iOS 26.6/26.6.1/26.6.2, iOS 27.0 dev beta 1-4,
+    /// iOS 27.0 public beta 1-2. Locked on all other iOS.
+    static func posterBoardAvailable() -> Bool {
+        let v = currentVersion
+        // iOS 26.6, 26.6.1, 26.6.2
+        if v.majorVersion == 26 && v.minorVersion == 6 && v.patchVersion <= 2 {
+            return true
+        }
+        // iOS 27.0 dev beta 1-4 / public beta 1-2
+        if v.majorVersion == 27 && v.minorVersion == 0 {
+            return mobileGestaltAvailable()
+        }
+        return false
+    }
+
+    /// Liquid Glass menu: iOS 26.2+ only. Blocked on iOS 27 and above.
+    static func liquidGlassAvailable() -> Bool {
+        let v = currentVersion
+        guard v.majorVersion == 26 else { return false }
+        return isAtLeast(v, major: 26, minor: 2)
+    }
+
     // MARK: Best path
 
     /// The most capable available path, most-capable first.

@@ -11,7 +11,8 @@ enum LiquidGlassFlow {
     case unsupported
 
     static var current: LiquidGlassFlow {
-        if WorkSlopSupport.isIOS26() { return .partialRestore }
+        // iOS 26.2+ only. Blocked on iOS 27 and above.
+        if WorkSlopSupport.liquidGlassAvailable() { return .partialRestore }
         return .unsupported
     }
 

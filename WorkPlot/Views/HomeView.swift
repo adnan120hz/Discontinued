@@ -302,7 +302,10 @@ struct HomeView: View {
     private func cellRow(_ cell: FlatCell) -> some View {
         switch cell {
         case .tweak(let tweak):
-            let supported = tweak.isSupportedOnCurrentOS()
+            // Global gate: Tweaks menu (bad_query MobileGestalt) only unlocks
+            // on iOS 27.0 dev beta 1-4 / public beta 1-2. On all other iOS
+            // the rows stay visible but locked.
+            let supported = WorkSlopSupport.mobileGestaltAvailable() && tweak.isSupportedOnCurrentOS()
             Button { toggle(tweak) } label: {
                 HStack(spacing: 12) {
                     Image(systemName: supported ? tweak.symbol : "lock.fill")
@@ -321,7 +324,7 @@ struct HomeView: View {
                             .font(.body.weight(.semibold))
                             .foregroundStyle(supported ? .primary : .secondary)
                             .lineLimit(2)
-                        Text(!supported ? "Requires \(tweak.minIOS ?? "?")+" :
+                        Text(!supported ? "Requires iOS 27.0 beta 1-4" :
                              tweak.isEnabled && configurationID == tweak.id ? "Configuring" : tweak.subtitle)
                             .font(.caption)
                             .foregroundStyle(!supported ? .secondary :
@@ -470,7 +473,7 @@ struct HomeView: View {
 
     private func toggle(_ tweak: Tweak) {
         // Locked tweaks cannot be enabled on unsupported iOS.
-        guard tweak.isSupportedOnCurrentOS() else { return }
+        guard WorkSlopSupport.mobileGestaltAvailable() && tweak.isSupportedOnCurrentOS() else { return }
         let willEnable = !tweak.isEnabled
         withAnimation(.snappy) {
             store.setEnabled(willEnable, for: tweak.id)

@@ -38,7 +38,7 @@ struct PosterBoardView: View {
         ZStack {
             NavigationStack {
                 Group {
-                    if BadQuery.isAvailable {
+                    if WorkSlopSupport.posterBoardAvailable() {
                         library
                     } else {
                         locked
@@ -48,7 +48,7 @@ struct PosterBoardView: View {
                 .navigationTitle("Library")
                 .navigationBarTitleDisplayMode(.large)
                 .toolbar {
-                    if BadQuery.isAvailable {
+                    if WorkSlopSupport.posterBoardAvailable() {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button { showTendiesImporter = true } label: {
                                 Image(systemName: "plus")
@@ -191,7 +191,7 @@ struct PosterBoardView: View {
                 .foregroundStyle(.secondary)
             Text("Library access unavailable")
                 .font(.title2.weight(.semibold))
-            Text("This iOS version cannot open PosterBoard's container through bad_query, so collections cannot be imported here.")
+            Text("PosterBoard requires iOS 26.6/26.6.1/26.6.2 or iOS 27.0 dev beta 1-4 / public beta 1-2 (\(WorkSlopSupport.deviceLabel())).")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Spacer()
