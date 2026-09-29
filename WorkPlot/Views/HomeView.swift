@@ -36,7 +36,9 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if DeviceCompatibility.supportsFullFeatureSet {
+                // All tweaks always visible; unsupported ones are grayed/locked.
+                // (Per user request: no more full-screen "Unsupported" gate.)
+                if true {
                     GeometryReader { geo in
                         let portrait = geo.size.height >= geo.size.width
                         ZStack {
@@ -300,13 +302,15 @@ struct HomeView: View {
     private func cellRow(_ cell: FlatCell) -> some View {
         switch cell {
         case .tweak(let tweak):
+            let supported = tweak.isSupportedOnCurrentOS()
             Button { toggle(tweak) } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: tweak.symbol)
+                    Image(systemName: supported ? tweak.symbol : "lock.fill")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.white)
                         .frame(width: 40, height: 40)
                         .background(
+                            !supported ? Color.gray.opacity(0.4) :
                             tweak.isEnabled ? Theme.wsBlue : Theme.wsBlue.opacity(0.35),
                             in: RoundedRectangle(cornerRadius: 11, style: .continuous)
                         )
@@ -315,24 +319,31 @@ struct HomeView: View {
                         // truncating mid-word.
                         Text(tweak.title)
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(supported ? .primary : .secondary)
                             .lineLimit(2)
-                        Text(tweak.isEnabled && configurationID == tweak.id ? "Configuring" : tweak.subtitle)
+                        Text(!supported ? "Requires \(tweak.minIOS ?? "?")+" :
+                             tweak.isEnabled && configurationID == tweak.id ? "Configuring" : tweak.subtitle)
                             .font(.caption)
-                            .foregroundStyle(tweak.isEnabled ? Theme.wsBlue : .secondary)
+                            .foregroundStyle(!supported ? .secondary :
+                                             tweak.isEnabled ? Theme.wsBlue : .secondary)
                             .lineLimit(2)
                     }
                     .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 6)
-                    Image(systemName: tweak.isEnabled ? "checkmark.circle.fill" : "circle")
+                    Image(systemName: !supported ? "lock.fill" :
+                          tweak.isEnabled ? "checkmark.circle.fill" : "circle")
                         .font(.title3)
-                        .foregroundStyle(tweak.isEnabled ? Theme.wsBlue : Color(uiColor: .tertiaryLabel))
+                        .foregroundStyle(!supported ? Color.gray :
+                                         tweak.isEnabled ? Theme.wsBlue : Color(uiColor: .tertiaryLabel))
                 }
                 .padding(.vertical, 9)
                 .contentShape(Rectangle())
+                .opacity(supported ? 1.0 : 0.6)
             }
             .buttonStyle(.plain)
-            .accessibilityHint(tweak.isEnabled ? "Disables this capability" : "Enables this capability")
+            .disabled(!supported)
+            .accessibilityHint(!supported ? "Not supported on this iOS version" :
+                              tweak.isEnabled ? "Disables this capability" : "Enables this capability")
         case .tool(let tool):
             toolRow(tool)
         }
@@ -459,6 +470,8 @@ struct HomeView: View {
     }
 
     private func toggle(_ tweak: Tweak) {
+        // Locked tweaks cannot be enabled on unsupported iOS.
+        guard tweak.isSupportedOnCurrentOS() else { return }
         let willEnable = !tweak.isEnabled
         withAnimation(.snappy) {
             store.setEnabled(willEnable, for: tweak.id)
