@@ -28,8 +28,8 @@ enum WorkSlopExploitPath {
 /// | darksword     | 15.0 – 26.0.1    | 26.1       | Kernel r/w (opa334/darksword)   |
 /// | kfd           | 15.0 – 16.6.1    | 17.0       | Kernel File Descriptor          |
 /// | airlift       | 26.6 – 27.x      | —          | Pairing-based (AirCard)         |
-/// | book restore  | 17.0 – 17.x?     | TBD        | Backup/restore based (research pending) |
-/// | sparse restore| 16.0 – 17.0?     | TBD        | Backup/restore based (research pending) |
+/// | book restore  | 17.x             | TBD        | Backup/restore based            |
+/// | sparse restore| 17.x (CVE-2024-44252) | 17.1+? | Backup/restore via CVE-2024-44252 |
 /// | afc           | < 27             | 27?        | Apple File Conduit (user claims patched on 27) |
 enum WorkSlopExploit {
     case badQuery
