@@ -89,8 +89,8 @@ Third-party components and their licenses are listed in [THIRD_PARTY_NOTICES.md]
 - **forcequitOS** ([forcequitOS/bad_query](https://github.com/forcequitOS/bad_query)) — bad_query sandbox escape
 - **Mak5er** ([Mak5er/AirCard-iOS](https://github.com/Mak5er/AirCard-iOS)) — AirCard on-device implementation
 - **Johnny Franks** ([0xjohnnydev](https://github.com/0xjohnnydev)) — AirLift exploit, FilzaSlop technique
-- **GoldenNugget** developer — Liquid Glass tweak reference
-- **mond** — MobileGestalt research references
+- **GoldenNugget** developer ([GoldenNugget-Team/GoldenNugget-mobile](https://github.com/GoldenNugget-Team/GoldenNugget-mobile)) — Liquid Glass tweak reference
+- **mond** ([rooootdev/mond](https://github.com/rooootdev/mond)) — MobileGestalt research references
 
 ---
 
