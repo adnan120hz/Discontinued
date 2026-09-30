@@ -44,7 +44,7 @@ struct HomeView: View {
                         let portrait = geo.size.height >= geo.size.width
                         ZStack {
                             ScrollView {
-                                VStack(alignment: .leading, spacing: 20) {
+                                LazyVStack(alignment: .leading, spacing: 20) {
                                     statusStrip
                                     if !portrait { categoryRail }
                                     catalog
