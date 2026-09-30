@@ -17,6 +17,23 @@
 				<string>AppIcon</string>
 			</array>
 		</dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>Syringe</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>syringe-icon</string>
+				</array>
+			</dict>
+			<key>Flask</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>flask-icon</string>
+				</array>
+			</dict>
+		</dict>
 	</dict>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>

@@ -20,6 +20,8 @@ struct SettingsView: View {
     @State private var showBackupError = false
     @State private var backupErrorMessage = ""
     @State private var showBackupImportedToast = false
+    @State private var currentIconName: String?
+    @State private var iconErrorMessage: String?
 
     private var os: DeviceCompatibility.OSInfo { DeviceCompatibility.currentInfo }
 
@@ -28,6 +30,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 22) {
                 deviceCard
                 appearance
+                if UIApplication.shared.supportsAlternateIcons { appIconSection }
                 connection
                 backup
                 diagnostics
@@ -39,6 +42,7 @@ struct SettingsView: View {
         .background(Theme.page)
         .navigationTitle("Preferences")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { currentIconName = UIApplication.shared.alternateIconName }
         .alert("Could not detect PosterBoard hash", isPresented: $showHashError) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -194,6 +198,75 @@ struct SettingsView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
             .wsCard(cornerRadius: 18)
+        }
+    }
+
+    // MARK: - App icon
+
+    private var appIconSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader("App Icon")
+            VStack(spacing: 0) {
+                appIconRow(title: "Default (WorkSlop)", iconName: nil)
+                Divider().padding(.leading, 44)
+                appIconRow(title: "Syringe", iconName: "Syringe")
+                Divider().padding(.leading, 44)
+                appIconRow(title: "Flask", iconName: "Flask")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .wsCard(cornerRadius: 18)
+            if let iconErrorMessage {
+                Text(iconErrorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func appIconRow(title: String, iconName: String?) -> some View {
+        let symbol: String
+        switch iconName {
+        case "Syringe": symbol = "syringe"
+        case "Flask": symbol = "flask.fill"
+        default: symbol = "app.fill"
+        }
+        return Button {
+            applyAppIcon(iconName)
+        } label: {
+            HStack(spacing: 12) {
+                iconTile(symbol)
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 8)
+                if currentIconName == iconName {
+                    Image(systemName: "checkmark")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Theme.wsBlue)
+                }
+            }
+            .padding(.vertical, 10)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func applyAppIcon(_ name: String?) {
+        guard UIApplication.shared.supportsAlternateIcons else {
+            iconErrorMessage = "Alternate app icons are not supported on this device."
+            return
+        }
+        UIApplication.shared.setAlternateIconName(name) { error in
+            DispatchQueue.main.async {
+                if let error {
+                    iconErrorMessage = error.localizedDescription
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                } else {
+                    iconErrorMessage = nil
+                    currentIconName = name
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
+            }
         }
     }
 

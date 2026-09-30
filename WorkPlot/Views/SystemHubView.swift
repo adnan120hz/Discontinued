@@ -49,7 +49,7 @@ struct SystemHubView: View {
                 Text("WorkSlop")
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.white)
-                Text("iOS system modification tools • beta 1")
+                Text("iOS system modification tools • beta 2")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.85))
             }

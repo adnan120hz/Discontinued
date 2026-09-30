@@ -108,7 +108,7 @@ struct HomeView: View {
             .opacity(store.enabledCount == 0 ? 0.4 : 1)
         }
         .padding(14)
-        .wsCard(cornerRadius: 18)
+        .tweakGlassCard(cornerRadius: 18)
     }
 
     private var stagedTitle: String {
@@ -158,7 +158,7 @@ struct HomeView: View {
         .padding(.vertical, 10)
         .padding(.horizontal, 6)
         .frame(width: menuWidth, alignment: .leading)
-        .wsFloat(cornerRadius: 18)
+        .tweakGlassFloat(cornerRadius: 18)
     }
 
     private func menuItem(title: String, symbol: String, isSelected: Bool, select: @escaping () -> Void) -> some View {
@@ -296,7 +296,7 @@ struct HomeView: View {
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 14)
-        .wsCard(cornerRadius: 18)
+        .tweakGlassCard(cornerRadius: 18)
     }
 
     @ViewBuilder
@@ -313,10 +313,11 @@ struct HomeView: View {
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.white)
                         .frame(width: 40, height: 40)
-                        .background(
-                            !supported ? Color.gray.opacity(0.4) :
-                            tweak.isEnabled ? Theme.wsBlue : Theme.wsBlue.opacity(0.35),
-                            in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .tweakGlassTile(
+                            fill: !supported ? Color.gray.opacity(0.4) :
+                                  tweak.isEnabled ? Theme.wsBlue : Theme.wsBlue.opacity(0.35),
+                            in: RoundedRectangle(cornerRadius: 11, style: .continuous),
+                            glass: supported
                         )
                     VStack(alignment: .leading, spacing: 2) {
                         // Titles wrap (up to two lines) instead of
@@ -370,7 +371,11 @@ struct HomeView: View {
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(width: 40, height: 40)
-                .background((supported ? Theme.wsBlue.opacity(0.55) : Color.gray.opacity(0.4)), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                .tweakGlassTile(
+                    fill: supported ? Theme.wsBlue.opacity(0.55) : Color.gray.opacity(0.4),
+                    in: RoundedRectangle(cornerRadius: 11, style: .continuous),
+                    glass: supported
+                )
             VStack(alignment: .leading, spacing: 2) {
                 Text(tool.title)
                     .font(.body.weight(.semibold))
@@ -439,7 +444,10 @@ struct HomeView: View {
                         Image(systemName: tweak.symbol)
                             .foregroundStyle(.white)
                             .frame(width: 30, height: 30)
-                            .background(Theme.wsBlue, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            .tweakGlassTile(
+                                fill: Theme.wsBlue,
+                                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            )
                         Text(tweak.title)
                             .font(.subheadline.weight(.medium))
                             .lineLimit(2)
@@ -463,7 +471,7 @@ struct HomeView: View {
             }
             .padding(.vertical, 6)
             .padding(.horizontal, 14)
-            .wsCard(cornerRadius: 18)
+            .tweakGlassCard(cornerRadius: 18)
         }
     }
 
@@ -500,6 +508,67 @@ struct HomeView: View {
     }
 }
 
+// MARK: - Blue glass card helpers (Tweaks menu, iOS 26+)
+
+/// Blue transparent glass surfaces for the Tweaks menu. On iOS 26+ the card
+/// fill becomes blue-tinted glass (WWDC25 `Glass` API); on older iOS the
+/// rendering is pixel-identical to the current solid style.
+extension View {
+    /// Drop-in replacement for `.wsCard(...)` in the Tweaks menu. Border and
+    /// shadow are preserved on both paths; only the fill changes.
+    @ViewBuilder
+    func tweakGlassCard(cornerRadius: CGFloat = Theme.cardRadius) -> some View {
+        if #available(iOS 26.0, *) {
+            self
+                .glassEffect(
+                    .regular.tint(.blue),
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(Theme.cardBorder, lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.07), radius: 10, x: 0, y: 3)
+        } else {
+            self.wsCard(cornerRadius: cornerRadius)
+        }
+    }
+
+    /// Drop-in replacement for `.wsFloat(...)` in the Tweaks menu. Border and
+    /// shadow are preserved on both paths; only the fill changes.
+    @ViewBuilder
+    func tweakGlassFloat(cornerRadius: CGFloat = Theme.cardRadius) -> some View {
+        if #available(iOS 26.0, *) {
+            self
+                .glassEffect(
+                    .regular.tint(.blue),
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(Theme.cardBorder, lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.16), radius: 18, x: 0, y: 7)
+        } else {
+            self.wsFloat(cornerRadius: cornerRadius)
+        }
+    }
+
+    /// Drop-in replacement for `.background(_:in:)` on icon tiles in the
+    /// Tweaks menu. `fill` and `shape` are used verbatim on iOS < 26; on
+    /// iOS 26+ the tile becomes blue-tinted glass in the same shape.
+    /// Pass `glass: false` to keep the solid fill even on iOS 26+ (used for
+    /// locked/disabled tiles so the gray "locked" cue stays visible).
+    @ViewBuilder
+    func tweakGlassTile<S: Shape>(fill: Color, in shape: S, glass: Bool = true) -> some View {
+        if #available(iOS 26.0, *), glass {
+            self.glassEffect(.regular.tint(.blue), in: shape)
+        } else {
+            self.background(fill, in: shape)
+        }
+    }
+}
+
 struct InlineTweakConfiguration: View {
     @EnvironmentObject private var store: GestaltStore
     let tweak: Tweak
@@ -517,13 +586,13 @@ struct InlineTweakConfiguration: View {
                 }
                 .pickerStyle(.wheel)
                 .frame(height: 138)
-                .wsCard(cornerRadius: 14)
+                .tweakGlassCard(cornerRadius: 14)
             case .textField(let placeholder, let keyboard):
                 TextField(placeholder, text: store.textBinding(for: tweak.id))
                     .keyboardType(keyboard == .numeric ? .numberPad : .default)
                     .textFieldStyle(.plain)
                     .padding(14)
-                    .wsCard(cornerRadius: 14)
+                    .tweakGlassCard(cornerRadius: 14)
             }
             if let note = tweak.notes {
                 Label(note, systemImage: "exclamationmark.triangle")
@@ -564,7 +633,7 @@ struct ApplyChangesView: View {
                 }
                 .padding(.vertical, 6)
                 .padding(.horizontal, 14)
-                .wsCard(cornerRadius: 18)
+                .tweakGlassCard(cornerRadius: 18)
                 ActionButton(title: "Apply \(store.enabledCount) changes", systemImage: "bolt.fill", isBusy: store.isBusy, action: apply)
                 Button("Restore pristine backup", role: .destructive) { showRestore = true }
                     .wsAction()
